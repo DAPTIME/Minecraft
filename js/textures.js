@@ -163,6 +163,128 @@ const painters = {
     for (let i = 0; i < 9; i++)
       px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0, "#e4ecbf");
   },
+  birch_log_side(ctx, rng) {
+    speckle(ctx, "#d8cfb6", 0.12, rng);
+    for (let i = 0; i < 7; i++) {
+      const y = (rng() * TILE) | 0, w = 1 + ((rng() * 3) | 0);
+      for (let x = 0; x < w; x++) px(ctx, ((rng() * TILE) | 0 + x) % TILE, y, "#3a3128");
+    }
+  },
+  birch_log_top(ctx, rng) {
+    speckle(ctx, "#e6dcc0", 0.12, rng);
+    const cx = 7.5;
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        if ((Math.hypot(x - cx, y - cx) | 0) % 3 === 0) px(ctx, x, y, shade("#cdbf99", 1));
+  },
+  birch_planks(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        px(ctx, x, y, shade("#d2c3a0", 1 + (rng() - 0.5) * 0.12));
+    for (let y = 0; y < TILE; y += 4)
+      for (let x = 0; x < TILE; x++) px(ctx, x, y, shade("#a9966f", 1));
+  },
+  birch_leaves(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) {
+        if (rng() < 0.12) { ctx.clearRect(x, y, 1, 1); continue; }
+        px(ctx, x, y, shade("#73ad53", 1 + (rng() - 0.5) * 0.45));
+      }
+  },
+  spruce_log_side(ctx, rng) {
+    for (let x = 0; x < TILE; x++) {
+      const bark = 0.8 + Math.abs(Math.sin(x * 0.9)) * 0.4;
+      for (let y = 0; y < TILE; y++)
+        px(ctx, x, y, shade("#4a3520", bark + (rng() - 0.5) * 0.2));
+    }
+  },
+  spruce_log_top(ctx, rng) {
+    speckle(ctx, "#6b5236", 0.16, rng);
+    const cx = 7.5;
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        if ((Math.hypot(x - cx, y - cx) | 0) % 3 === 0) px(ctx, x, y, shade("#503c26", 1));
+  },
+  spruce_planks(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        px(ctx, x, y, shade("#6e5436", 1 + (rng() - 0.5) * 0.14));
+    for (let y = 0; y < TILE; y += 4)
+      for (let x = 0; x < TILE; x++) px(ctx, x, y, shade("#4d3a25", 1));
+  },
+  spruce_leaves(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) {
+        if (rng() < 0.13) { ctx.clearRect(x, y, 1, 1); continue; }
+        px(ctx, x, y, shade("#2f5e2a", 1 + (rng() - 0.5) * 0.5));
+      }
+  },
+  netherrack(ctx, rng) {
+    speckle(ctx, "#7a2a26", 0.3, rng);
+    for (let i = 0; i < 24; i++)
+      px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0,
+         shade(rng() > 0.5 ? "#4f1a18" : "#9c3b34", 1));
+  },
+  slime(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        px(ctx, x, y, shade("#6fbf5a", 1 + (rng() - 0.5) * 0.2));
+    ctx.strokeStyle = "#3f8a36";
+    ctx.strokeRect(2.5, 2.5, TILE - 5, TILE - 5);
+    ctx.strokeStyle = "#9fe089";
+    ctx.strokeRect(4.5, 4.5, TILE - 9, TILE - 9);
+  },
+  wool(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++)
+        px(ctx, x, y, shade("#ececec", 1 + (rng() - 0.5) * 0.14));
+  },
+  redstone_block(ctx, rng) {
+    speckle(ctx, "#c0302a", 0.22, rng);
+    for (let i = 0; i < 14; i++)
+      px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0, "#ff5a4f");
+  },
+  redstone_dust(ctx, rng) {
+    speckle(ctx, "#3a3a3a", 0.2, rng);
+    ctx.strokeStyle = "#c81e10"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(8, 0); ctx.lineTo(8, 16);
+    ctx.moveTo(0, 8); ctx.lineTo(16, 8);
+    ctx.stroke();
+  },
+  lever(ctx, rng) {
+    speckle(ctx, "#8a8a8a", 0.2, rng);
+    ctx.fillStyle = "#6b4f2a"; ctx.fillRect(7, 3, 2, 9);
+    ctx.fillStyle = "#caa"; ctx.fillRect(6, 2, 4, 3);
+  },
+  repeater(ctx, rng) {
+    speckle(ctx, "#b4b0aa", 0.14, rng);
+    ctx.fillStyle = "#c81e10";
+    ctx.fillRect(7, 2, 2, 12);
+    ctx.fillStyle = "#7a2a26";
+    ctx.fillRect(5, 9, 2, 3); ctx.fillRect(9, 5, 2, 3);
+  },
+  piston(ctx, rng) {
+    speckle(ctx, "#9a8a6a", 0.16, rng);
+    ctx.strokeStyle = "#5a4a2c"; ctx.strokeRect(0.5, 0.5, 15, 15);
+  },
+  piston_head(ctx, rng) {
+    speckle(ctx, "#c2b48a", 0.14, rng);
+    ctx.fillStyle = "#8a7a52"; ctx.fillRect(0, 0, TILE, 4);
+    ctx.fillStyle = "#5a4a2c"; ctx.fillRect(6, 4, 4, 12);
+  },
+  sticky_piston(ctx, rng) {
+    speckle(ctx, "#9a8a6a", 0.16, rng);
+    ctx.fillStyle = "#6fbf5a"; ctx.fillRect(4, 4, 8, 8);
+    ctx.strokeStyle = "#5a4a2c"; ctx.strokeRect(0.5, 0.5, 15, 15);
+  },
+  portal(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) {
+        const v = 0.5 + 0.5 * Math.sin((x + y) * 0.8 + rng() * 0.6);
+        px(ctx, x, y, shade("#7b3fb0", 0.6 + v * 0.8));
+      }
+  },
 };
 
 // order of tiles inside the atlas
@@ -170,6 +292,10 @@ const TILE_NAMES = [
   "grass_top", "grass_side", "dirt", "stone", "cobblestone", "sand",
   "gravel", "water", "log_side", "log_top", "leaves", "planks",
   "glass", "bedrock", "path", "sandstone", "orange", "cactus",
+  "birch_log_side", "birch_log_top", "birch_planks", "birch_leaves",
+  "spruce_log_side", "spruce_log_top", "spruce_planks", "spruce_leaves",
+  "netherrack", "slime", "wool", "redstone_block", "redstone_dust",
+  "lever", "repeater", "piston", "piston_head", "sticky_piston", "portal",
 ];
 
 export function buildAtlas() {

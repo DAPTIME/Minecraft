@@ -47,26 +47,10 @@ export function generateDesertTemple(world, bx, bz, rng) {
   world.setBlockGen(bx + 6, gy + 4, bz, OR);
   world.setBlockGen(bx + 5, gy + 4, bz, OR);
   world.setBlockGen(bx + 7, gy + 4, bz, OR);
-}
 
-// --- Desert Well -------------------------------------------------------------
-export function generateDesertWell(world, wx, wz, rng) {
-  const gy = world.surfaceHeight(wx, wz);
-  if (gy <= SEA + 1) return;
-  const SS = B.SANDSTONE;
-
-  for (let x = -2; x <= 2; x++)
-    for (let z = -2; z <= 2; z++)
-      world.setBlockGen(wx + x, gy, wz + z, SS);
-  world.setBlockGen(wx, gy, wz, B.WATER);
-  world.setBlockGen(wx, gy - 1, wz, B.WATER);
-
-  for (const [dx, dz] of [[-1,-1],[1,-1],[-1,1],[1,1]])
-    for (let y = 1; y <= 3; y++)
-      world.setBlockGen(wx + dx, gy + y, wz + dz, SS);
-  for (let x = -1; x <= 1; x++)
-    for (let z = -1; z <= 1; z++)
-      world.setBlockGen(wx + x, gy + 4, wz + z, SS);
+  // hidden slime cache — break these for slimeballs
+  for (const [dx, dz] of [[6,6],[5,6],[7,6],[6,5],[6,7]])
+    world.setBlockGen(bx + dx, gy + 1, bz + dz, B.SLIME);
 }
 
 // --- Pillager Outpost: a tall log/cobblestone watchtower ---------------------

@@ -101,6 +101,12 @@ body { font-family: "Trebuchet MS", Verdana, sans-serif; }
 }
 .overlay button:hover { background: #7ac74f; }
 #controls { color: #ccc; font-size: 14px; line-height: 1.9; text-align: center; }
+.seedrow { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.seedrow label { color: #aaa; font-size: 13px; }
+#seed {
+  padding: 8px 12px; font-size: 15px; width: 260px; text-align: center;
+  background: #1c2230; color: #eee; border: 2px solid #3a4a2e; border-radius: 4px;
+}
 #death h1 { color: #c0212d; text-shadow: 3px 3px 0 #3a0a0e; }
 
 #inv-grid { display: grid; grid-template-columns: repeat(6, 56px); gap: 6px; }
