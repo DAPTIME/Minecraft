@@ -786,7 +786,7 @@ function loop() {
   queueAround(pcx, pcz);
 
   debugEl.textContent =
-    `Voxelcraft  (seed ${SEED})\n` +
+    `DevCraft  (seed ${SEED})\n` +
     `xyz ${player.pos.x.toFixed(1)} ${player.pos.y.toFixed(1)} ${player.pos.z.toFixed(1)}\n` +
     `chunks ${chunkMeshes.size}  mobs ${mobs.length}\n` +
     `time ${(timeOfDay * 24).toFixed(1)}h  ${isDay() ? "day" : "night"}\n` +
