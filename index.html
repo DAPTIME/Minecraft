@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Voxelcraft</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="game">
+  <canvas id="canvas"></canvas>
+  <div id="crosshair">+</div>
+
+  <div id="hud">
+    <div id="bars">
+      <div id="healthbar" class="statbar"></div>
+      <div id="armorbar" class="statbar"></div>
+    </div>
+    <div id="hotbar"></div>
+  </div>
+
+  <div id="hand"></div>
+  <div id="debug"></div>
+  <div id="toast"></div>
+
+  <div id="inventory" class="overlay hidden">
+    <h2>Inventory</h2>
+    <div id="inv-grid"></div>
+    <div class="inv-section">
+      <h3>Armor</h3>
+      <div id="armor-slot" class="armor-slot" title="Wooden Armor — breaks after 10 hits">empty</div>
+    </div>
+    <p class="hint">Click an item to put it on the hotbar. Press E to close.</p>
+  </div>
+
+  <div id="death" class="overlay hidden">
+    <h1>You Died</h1>
+    <button id="respawn">Respawn</button>
+  </div>
+
+  <div id="menu" class="overlay">
+    <h1>VOXELCRAFT</h1>
+    <p class="sub">An original voxel sandbox in the Minecraft 1.14 style</p>
+    <button id="play">Play</button>
+    <div id="controls">
+      <p><b>WASD</b> move &nbsp; <b>Space</b> jump &nbsp; <b>Shift</b> sprint</p>
+      <p><b>Left click</b> break / attack &nbsp; <b>Right click</b> place block</p>
+      <p><b>1–9</b> or scroll select &nbsp; <b>E</b> inventory &nbsp; <b>F</b> toggle fly</p>
+      <p><b>R</b> equip wooden armor</p>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
