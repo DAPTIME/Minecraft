@@ -142,13 +142,34 @@ const painters = {
     ctx.strokeStyle = shade("#5c4329", 1);
     ctx.strokeRect(0.5, 0.5, TILE - 1, TILE - 1);
   },
+  sandstone(ctx, rng) {
+    speckle(ctx, "#dccb92", 0.1, rng);
+    for (let y = 0; y < TILE; y += 5)
+      for (let x = 0; x < TILE; x++) px(ctx, x, y, shade("#bfa869", 1));
+    for (let y = 1; y < TILE; y += 5)
+      for (let x = 0; x < TILE; x++) px(ctx, x, y, shade("#c9b67d", 1));
+  },
+  orange(ctx, rng) {
+    speckle(ctx, "#d8731f", 0.16, rng);
+    for (let i = 0; i < 10; i++)
+      px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0, shade("#b85a13", 1));
+  },
+  cactus(ctx, rng) {
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) {
+        const rib = x % 5 === 2 || x % 5 === 3;
+        px(ctx, x, y, shade(rib ? "#3a5e29" : "#4f7d3a", 1 + (rng() - 0.5) * 0.18));
+      }
+    for (let i = 0; i < 9; i++)
+      px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0, "#e4ecbf");
+  },
 };
 
 // order of tiles inside the atlas
 const TILE_NAMES = [
   "grass_top", "grass_side", "dirt", "stone", "cobblestone", "sand",
   "gravel", "water", "log_side", "log_top", "leaves", "planks",
-  "glass", "bedrock", "path",
+  "glass", "bedrock", "path", "sandstone", "orange", "cactus",
 ];
 
 export function buildAtlas() {

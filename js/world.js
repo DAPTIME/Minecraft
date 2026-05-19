@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { fbm, makeRng } from "./noise.js";
 import { generateVillage } from "./villages.js";
+import { generateDesertTemple, generateDesertWell, generatePillagerOutpost } from "./structures.js";
 
 export const CHUNK = 16;
 export const HEIGHT = 72;
@@ -12,6 +13,7 @@ export const SEA = 24;
 export const B = {
   AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, COBBLE: 4, SAND: 5, GRAVEL: 6,
   WATER: 7, LOG: 8, LEAVES: 9, PLANKS: 10, GLASS: 11, BEDROCK: 12, PATH: 13,
+  SANDSTONE: 14, ORANGE: 15, CACTUS: 16,
 };
 
 export const BLOCKS = {
@@ -28,6 +30,9 @@ export const BLOCKS = {
   [B.GLASS]:  { name: "Glass",       all: "glass", solid: true, transparent: true },
   [B.BEDROCK]:{ name: "Bedrock",     all: "bedrock", solid: true },
   [B.PATH]:   { name: "Path",        top: "path", side: "grass_side", bottom: "dirt", solid: true },
+  [B.SANDSTONE]: { name: "Sandstone", all: "sandstone", solid: true },
+  [B.ORANGE]: { name: "Orange Block", all: "orange", solid: true },
+  [B.CACTUS]: { name: "Cactus",      all: "cactus", solid: true },
 };
 
 function faceTile(id, face) {
@@ -74,6 +79,11 @@ export class World {
     return Math.max(2, Math.min(HEIGHT - 12, Math.floor(h)));
   }
 
+  // biome of a world column: "desert" or "plains"
+  biome(wx, wz) {
+    return fbm(wx, wz, this.seed + 555, 3, 0.0045) > 0.6 ? "desert" : "plains";
+  }
+
   ensureTerrain(cx, cz) {
     const k = this.key(cx, cz);
     if (this.terrainDone.has(k)) return this.chunks.get(k);
@@ -83,12 +93,14 @@ export class World {
         const wx = cx * CHUNK + x, wz = cz * CHUNK + z;
         const h = this.surfaceHeight(wx, wz);
         const beach = h <= SEA + 1;
+        const desert = this.biome(wx, wz) === "desert";
         for (let y = 0; y < HEIGHT; y++) {
           let id = B.AIR;
           if (y === 0) id = B.BEDROCK;
           else if (y < h - 4) id = B.STONE;
-          else if (y < h) id = beach ? B.SAND : B.DIRT;
-          else if (y === h) id = beach ? B.SAND : B.GRASS;
+          else if (y < h) id = desert ? (y < h - 1 ? B.SANDSTONE : B.SAND)
+                                       : (beach ? B.SAND : B.DIRT);
+          else if (y === h) id = desert ? B.SAND : (beach ? B.SAND : B.GRASS);
           else if (y <= SEA) id = B.WATER;
           data[this.idx(x, y, z)] = id;
         }
@@ -106,20 +118,49 @@ export class World {
     this.decorated.add(k);            // mark first to avoid recursion via setBlockGen
 
     const rng = makeRng(this.seed ^ (cx * 341873128) ^ (cz * 132897987));
+    const m = (v, n) => ((v % n) + n) % n;
+    const acx = cx * CHUNK + 8, acz = cz * CHUNK + 8;   // chunk centre
+    const centreBiome = this.biome(acx, acz);
 
-    // villages: one anchor per 4x4 chunk grid, ~35% chance
-    if (((cx % 4) + 4) % 4 === 0 && ((cz % 4) + 4) % 4 === 0) {
+    // villages: one anchor per 4x4 chunk grid, plains only
+    if (m(cx, 4) === 0 && m(cz, 4) === 0 && centreBiome === "plains") {
       const vrng = makeRng(this.seed ^ (cx * 91138233) ^ (cz * 471232));
-      if (vrng() < 0.45) generateVillage(this, cx, cz, vrng);
+      if (vrng() < 0.5) generateVillage(this, cx, cz, vrng);
     }
 
-    // trees
+    // desert temple (pyramid): 3x3 chunk grid, desert only
+    if (m(cx, 3) === 1 && m(cz, 3) === 1 && centreBiome === "desert") {
+      const trng = makeRng(this.seed ^ (cx * 70253) ^ (cz * 1992873));
+      if (trng() < 0.6) generateDesertTemple(this, cx * CHUNK + 1, cz * CHUNK + 1, trng);
+    }
+
+    // desert well: 3x3 chunk grid offset, desert only
+    if (m(cx, 3) === 2 && m(cz, 3) === 2 && centreBiome === "desert") {
+      const wrng = makeRng(this.seed ^ (cx * 553) ^ (cz * 8821));
+      if (wrng() < 0.45) generateDesertWell(this, acx, acz, wrng);
+    }
+
+    // pillager outpost: 6x6 chunk grid
+    if (m(cx, 6) === 3 && m(cz, 6) === 3) {
+      const org = makeRng(this.seed ^ (cx * 33119) ^ (cz * 60101));
+      if (org() < 0.5) generatePillagerOutpost(this, cx * CHUNK + 5, cz * CHUNK + 5, org);
+    }
+
+    // trees (plains only)
     for (let x = 2; x < CHUNK - 2; x++)
       for (let z = 2; z < CHUNK - 2; z++) {
-        if (rng() > 0.018) continue;
         const wx = cx * CHUNK + x, wz = cz * CHUNK + z;
         const h = this.surfaceHeight(wx, wz);
         if (h <= SEA) continue;
+        if (this.biome(wx, wz) === "desert") {
+          // cacti
+          if (rng() < 0.012 && this.getBlock(wx, h, wz) === B.SAND) {
+            const tall = 1 + ((rng() * 3) | 0);
+            for (let i = 1; i <= tall; i++) this.setBlockGen(wx, h + i, wz, B.CACTUS);
+          }
+          continue;
+        }
+        if (rng() > 0.018) continue;
         if (this.getBlock(wx, h, wz) !== B.GRASS) continue;
         this.placeTree(wx, h + 1, wz, rng);
       }

@@ -278,7 +278,7 @@ function raycastBlock() {
 // =============================================================================
 const HOTBAR = [B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.PLANKS, B.LOG, B.LEAVES, B.GLASS, B.SAND];
 const ALL_BLOCKS = [B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.SAND, B.GRAVEL,
-  B.LOG, B.LEAVES, B.PLANKS, B.GLASS];
+  B.LOG, B.LEAVES, B.PLANKS, B.GLASS, B.SANDSTONE, B.ORANGE, B.CACTUS];
 let selected = 0;
 
 const hotbarEl = document.getElementById("hotbar");
@@ -463,6 +463,17 @@ function makeZombie() {
   return g;
 }
 
+function makePillager() {
+  const g = new THREE.Group();
+  const body = boxMesh(0.5, 0.8, 0.28, 0x53565c); body.position.y = 0.7; g.add(body);
+  const head = boxMesh(0.45, 0.45, 0.45, 0x9aa0a6); head.position.y = 1.32; g.add(head);
+  const nose = boxMesh(0.12, 0.2, 0.16, 0x7c8086); nose.position.set(0, 1.28, 0.26); g.add(nose);
+  const armL = boxMesh(0.15, 0.7, 0.2, 0x44464b); armL.position.set(-0.32, 0.95, 0.2); armL.rotation.x = -1.0; g.add(armL);
+  const armR = boxMesh(0.15, 0.7, 0.2, 0x44464b); armR.position.set(0.32, 0.95, 0.2); armR.rotation.x = -1.0; g.add(armR);
+  const crossbow = boxMesh(0.35, 0.1, 0.1, 0x3a2a18); crossbow.position.set(0, 1.05, 0.45); g.add(crossbow);
+  return g;
+}
+
 function groundHeightAt(x, z) {
   for (let y = HEIGHT - 1; y > 0; y--) {
     const id = world.getBlock(Math.floor(x), y, Math.floor(z));
@@ -472,13 +483,15 @@ function groundHeightAt(x, z) {
 }
 
 function spawnMob(type, x, y, z) {
-  const mesh = type === "zombie" ? makeZombie() : makeVillager();
+  const mesh = type === "zombie" ? makeZombie()
+             : type === "pillager" ? makePillager()
+             : makeVillager();
   scene.add(mesh);
   const mob = {
     type, mesh,
     pos: new THREE.Vector3(x, y, z),
     vel: new THREE.Vector3(),
-    health: type === "zombie" ? 10 : 12,
+    health: type === "zombie" ? 10 : type === "pillager" ? 16 : 12,
     home: new THREE.Vector3(x, y, z),
     wander: new THREE.Vector3(x, y, z),
     attackCd: 0, wanderCd: 0, onGround: false,
@@ -498,6 +511,16 @@ function spawnVillagers() {
   }
 }
 
+function spawnPillagers() {
+  const list = world.pillagerSpawns || [];
+  for (const s of list) {
+    if (mobs.length > 90) break;
+    const at = new THREE.Vector3(s.x, s.y, s.z);
+    if (mobs.some(m => m.type === "pillager" && m.home.distanceTo(at) < 0.5)) continue;
+    if (player.pos.distanceTo(at) < 70) spawnMob("pillager", s.x, s.y, s.z);
+  }
+}
+
 function updateMobs(dt) {
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i];
@@ -508,13 +531,14 @@ function updateMobs(dt) {
     if (dist > 110) { scene.remove(m.mesh); mobs.splice(i, 1); continue; }
 
     let move = new THREE.Vector3();
-    if (m.type === "zombie") {
-      // burn in daylight
-      if (isDay() && m.pos.y > SEA) { m.health -= dt * 4; }
-      if (dist < 26) {
-        move.copy(toPlayer).setY(0).normalize().multiplyScalar(2.6);
-        if (dist < 1.4 && m.attackCd <= 0) {
-          hurtPlayer(4);
+    if (m.type !== "villager") {
+      // zombies burn in daylight; pillagers do not
+      if (m.type === "zombie" && isDay() && m.pos.y > SEA) m.health -= dt * 4;
+      const aggro = m.type === "pillager" ? 32 : 26;
+      if (dist < aggro) {
+        move.copy(toPlayer).setY(0).normalize().multiplyScalar(m.type === "pillager" ? 2.9 : 2.6);
+        if (dist < 1.6 && m.attackCd <= 0) {
+          hurtPlayer(m.type === "pillager" ? 3 : 4);
           m.attackCd = 1.0;
           // knockback
           player.vel.addScaledVector(toPlayer.setY(0).normalize(), 4);
@@ -755,7 +779,7 @@ function loop() {
     updateMobs(dt);
     spawnZombies();
     villagerTimer -= dt;
-    if (villagerTimer <= 0) { spawnVillagers(); villagerTimer = 2; }
+    if (villagerTimer <= 0) { spawnVillagers(); spawnPillagers(); villagerTimer = 2; }
   }
 
   updateChunks(dt);
