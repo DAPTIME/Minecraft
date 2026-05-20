@@ -19,6 +19,7 @@ export const B = {
   NETHERRACK: 23, SLIME: 24, WOOL: 25,
   REDSTONE_BLOCK: 26, REDSTONE_DUST: 27, LEVER: 28, REPEATER: 29,
   PISTON: 30, STICKY_PISTON: 31, PISTON_HEAD: 32, PORTAL: 33,
+  LAVA: 34,
 };
 
 export const BLOCKS = {
@@ -55,6 +56,7 @@ export const BLOCKS = {
   [B.STICKY_PISTON]: { name: "Sticky Piston", all: "sticky_piston", solid: true },
   [B.PISTON_HEAD]: { name: "Piston Head", all: "piston_head", solid: true },
   [B.PORTAL]: { name: "Nether Portal", all: "portal", solid: false, transparent: true },
+  [B.LAVA]:  { name: "Lava", all: "lava", solid: false, transparent: true, liquid: true },
 };
 
 function faceTile(id, face) {
@@ -171,10 +173,16 @@ export class World {
   }
 
   fillNetherColumn(data, x, z, wx, wz) {
+    const LAVA_SEA = MIN_Y + 12;                       // y = -52
+    const n = fbm(wx, wz, this.seed + 701, 4, 0.012);  // 0..1
+    const surf = MIN_Y + 4 + Math.floor(n * 50);       // -60..-10
     for (let wy = MIN_Y; wy <= MAX_Y; wy++) {
-      let id = B.NETHERRACK;
+      let id = B.AIR;
       if (wy === MIN_Y || wy === MAX_Y) id = B.BEDROCK;
-      else if (this.carveCave(wx, wy, wz)) id = B.AIR;
+      else if (wy <= surf)
+        id = this.carveCave(wx, wy, wz) ? B.AIR : B.NETHERRACK;
+      // sea of lava: any open space at or below the lava sea fills with lava
+      if (id === B.AIR && wy <= LAVA_SEA) id = B.LAVA;
       data[this.idx(x, wy, z)] = id;
     }
   }

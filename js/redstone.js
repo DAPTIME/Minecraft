@@ -13,7 +13,7 @@ const N6 = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
 
 function movable(id) {
   return id !== B.AIR && id !== B.BEDROCK && id !== B.PISTON_HEAD &&
-         id !== B.WATER && !PISTONS.has(id);
+         id !== B.WATER && id !== B.LAVA && !PISTONS.has(id);
 }
 
 function extendPiston(world, x, y, z, id, m, changed) {

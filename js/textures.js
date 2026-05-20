@@ -321,6 +321,24 @@ const painters = {
     ctx.strokeStyle = "#9fe089";
     ctx.strokeRect(11.5, 11.5, TILE - 23, TILE - 23);
   },
+  lava(ctx, rng) {
+    fill(ctx, "#e07a1f");
+    noise(ctx, "#e07a1f", 0.14, rng);
+    // brighter molten flecks
+    for (let i = 0; i < 14; i++) {
+      const x = (rng() * (TILE - 2)) | 0, y = (rng() * (TILE - 2)) | 0;
+      rect(ctx, x, y, 2, 2, "#ffce5a");
+    }
+    // dark crusts
+    for (let i = 0; i < 10; i++) {
+      const x = (rng() * (TILE - 2)) | 0, y = (rng() * (TILE - 2)) | 0;
+      rect(ctx, x, y, 2, 2, "#a83d12");
+    }
+    // horizontal flowing streaks
+    for (let y = 5; y < TILE; y += 9)
+      for (let x = 0; x < TILE; x++)
+        if (rng() < 0.4) px(ctx, x, y, "#ffa552");
+  },
   portal(ctx, rng) {
     // vertical wavy bands of purple, like a portal interior
     for (let y = 0; y < TILE; y++)
@@ -382,6 +400,7 @@ const TILE_NAMES = [
   "spruce_log_side", "spruce_log_top", "spruce_planks", "spruce_leaves",
   "netherrack", "slime", "wool", "redstone_block", "redstone_dust",
   "lever", "repeater", "piston", "piston_head", "sticky_piston", "portal",
+  "lava",
 ];
 
 export function buildAtlas() {

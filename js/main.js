@@ -77,8 +77,8 @@ const player = {
   pos: new THREE.Vector3(),
   vel: new THREE.Vector3(),
   yaw: 0, pitch: 0,
-  onGround: false, flying: false, inWater: false,
-  health: 20, maxHealth: 20, hurtCooldown: 0,
+  onGround: false, flying: false, inWater: false, inLava: false,
+  health: 20, maxHealth: 20, hurtCooldown: 0, lavaCd: 0,
 };
 const P_RAD = 0.3, P_HEIGHT = 1.8, EYE = 1.62;
 const spawn = new THREE.Vector3();
@@ -122,6 +122,11 @@ function collideAxis(axis) {
 function updatePlayer(dt) {
   const feet = world.getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.1), Math.floor(player.pos.z));
   player.inWater = feet === B.WATER;
+  player.inLava = feet === B.LAVA;
+  if (player.inLava) {
+    player.lavaCd -= dt;
+    if (player.lavaCd <= 0) { hurtPlayer(4); player.lavaCd = 0.5; }
+  } else player.lavaCd = 0;
 
   const kb = Settings.keys;
   const speed = player.flying ? 9 : keys.has(kb.sprint) ? 6.5 : 4.3;
@@ -299,7 +304,7 @@ const ALL_BLOCKS = [
   B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.SAND, B.GRAVEL, B.SANDSTONE, B.ORANGE,
   B.LOG, B.PLANKS, B.LEAVES, B.BIRCH_LOG, B.BIRCH_PLANKS, B.BIRCH_LEAVES,
   B.SPRUCE_LOG, B.SPRUCE_PLANKS, B.SPRUCE_LEAVES, B.GLASS, B.CACTUS,
-  B.NETHERRACK, B.SLIME, B.WOOL,
+  B.NETHERRACK, B.SLIME, B.WOOL, B.LAVA,
   B.REDSTONE_BLOCK, B.REDSTONE_DUST, B.LEVER, B.REPEATER,
   B.PISTON, B.STICKY_PISTON, B.PORTAL,
 ];
@@ -382,7 +387,7 @@ function updateHand() {
 function setGamemode(g) {
   if (g !== "survival" && g !== "creative") return;
   gamemode = g;
-  if (g === "survival") player.flying = false;
+  player.flying = (g === "creative");          // creative auto-enables fly
   buildHotbar(); buildInventory(); updateHand();
   chatMsg("Game mode set to " + g);
 }
