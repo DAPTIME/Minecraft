@@ -915,8 +915,17 @@ function applySettings() {
   scene.fog = Settings.fog ? fog : null;
 }
 
-document.getElementById("play").onclick = startGame;
+document.getElementById("play").onclick = () => {
+  if (running) { menu.classList.add("hidden"); canvas.requestPointerLock(); }
+  else startGame();
+};
 const settingsOverlay = document.getElementById("settings");
+function showMenu() {
+  document.getElementById("play").textContent = running ? "Resume" : "Play";
+  const seedRow = document.querySelector(".seedrow");
+  if (seedRow) seedRow.style.display = running ? "none" : "";
+  menu.classList.remove("hidden");
+}
 document.getElementById("open-settings").onclick = () => {
   buildSettingsUI(applySettings);
   menu.classList.add("hidden");
@@ -924,12 +933,14 @@ document.getElementById("open-settings").onclick = () => {
 };
 document.getElementById("settings-close").onclick = () => {
   settingsOverlay.classList.add("hidden");
-  if (!running) menu.classList.remove("hidden");
+  if (running) canvas.requestPointerLock();    // resume the game directly
+  else showMenu();
 };
 document.addEventListener("pointerlockchange", () => {
   if (document.pointerLockElement !== canvas && running && !inventoryOpen && !chatOpen
-      && document.getElementById("death").classList.contains("hidden"))
-    menu.classList.remove("hidden");
+      && document.getElementById("death").classList.contains("hidden")
+      && settingsOverlay.classList.contains("hidden"))
+    showMenu();
   else menu.classList.add("hidden");
 });
 
