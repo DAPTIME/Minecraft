@@ -122,7 +122,10 @@ export class World {
   // true => this voxel should be carved into a cave
   carveCave(wx, wy, wz) {
     if (this.nether) {
-      return fbm3(wx, wy, wz, this.seed + 99, 3, 0.05) > 0.5;   // big caverns
+      // big sweeping caverns: combine large-scale + medium noise
+      const big = fbm3(wx, wy, wz, this.seed + 99, 3, 0.028);
+      const med = fbm3(wx, wy, wz, this.seed + 211, 2, 0.07);
+      return big > 0.42 || med > 0.56;
     }
     const v = fbm3(wx, wy, wz, this.seed + 42, 3, 0.06);
     return Math.abs(v - 0.5) < 0.062;                            // winding tunnels

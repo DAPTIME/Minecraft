@@ -405,6 +405,7 @@ function equipArmor() {
 // Damage / death
 // =============================================================================
 function hurtPlayer(amount) {
+  if (gamemode === "creative") return;            // creative is invulnerable
   if (player.hurtCooldown > 0 || amount <= 0) return;
   player.hurtCooldown = 0.5;
   if (armor.equipped) {
@@ -834,7 +835,13 @@ function runCommand(t) {
     else if (g === "survival" || g === "s") setGamemode("survival");
     else chatMsg("Usage: /gamemode <creative|survival>");
   } else if (p[0] === "help") {
-    chatMsg("Commands: /gamemode creative, /gamemode survival");
+    chatMsg("Commands: /gamemode creative | /gamemode survival | /settings");
+  } else if (p[0] === "settings") {
+    buildSettingsUI(applySettings);
+    menu.classList.add("hidden");
+    settingsOverlay.classList.remove("hidden");
+    document.exitPointerLock();
+    closeChat();
   } else {
     chatMsg("Unknown command: /" + p[0]);
   }
@@ -907,6 +914,7 @@ function startGame() {
   running = true;
   menu.classList.add("hidden");
   canvas.requestPointerLock();
+  toast("Esc for pause menu  •  /settings to open settings");
 }
 function applySettings() {
   RENDER_DIST = Settings.renderDist;
