@@ -1,11 +1,13 @@
-// Procedural pixel-art textures, generated entirely in code at 32x32.
+// Procedural 32x32 textures, generated entirely in code.
+// Styled to read clearly as Minecraft-style blocks; nothing here is a copy
+// of any Mojang asset.
 import * as THREE from "three";
 import { makeRng } from "./noise.js";
 
-const TILE = 32;          // pixels per tile
-const COLS = 8;           // tiles per atlas row
-const U = TILE / 16;      // scale unit relative to a 16px design grid
+const TILE = 32;
+const COLS = 8;
 
+// ---------------- low-level helpers ----------------------------------------
 function tileCtx() {
   const c = document.createElement("canvas");
   c.width = c.height = TILE;
@@ -21,201 +23,353 @@ function shade(hex, m) {
   const b = Math.max(0, Math.min(255, (n & 255) * m | 0));
   return `rgb(${r},${g},${b})`;
 }
-function speckle(ctx, base, amount, rng) {
+function fill(ctx, color) { rect(ctx, 0, 0, TILE, TILE, color); }
+function noise(ctx, base, amp, rng) {
   for (let y = 0; y < TILE; y++)
     for (let x = 0; x < TILE; x++)
-      px(ctx, x, y, shade(base, 1 + (rng() - 0.5) * amount));
+      px(ctx, x, y, shade(base, 1 + (rng() - 0.5) * amp));
 }
-function scatter(ctx, count, color, rng, vary = 0) {
+function speckles(ctx, count, color, rng, vary = 0) {
   for (let i = 0; i < count; i++)
     px(ctx, (rng() * TILE) | 0, (rng() * TILE) | 0,
        vary ? shade(color, 1 + (rng() - 0.5) * vary) : color);
 }
 
+// ---------------- painters --------------------------------------------------
 const painters = {
   grass_top(ctx, rng) {
-    speckle(ctx, "#5fa83a", 0.35, rng);
-    scatter(ctx, 110, "#74c24a", rng, 0.25);
-    scatter(ctx, 40, "#4f9030", rng);
+    fill(ctx, "#5fa83a");
+    noise(ctx, "#5fa83a", 0.18, rng);
+    speckles(ctx, 70, "#74c24a", rng, 0.15);
+    speckles(ctx, 30, "#4f9030", rng);
   },
   grass_side(ctx, rng) {
-    speckle(ctx, "#7a5b3a", 0.3, rng);
+    // dirt base
+    fill(ctx, "#7a5b3a");
+    noise(ctx, "#7a5b3a", 0.22, rng);
+    speckles(ctx, 50, "#5c4329", rng);
+    // grass strip across the top with an irregular edge
     for (let x = 0; x < TILE; x++) {
-      const h = (6 + rng() * 8) | 0;
+      const h = 5 + ((rng() * 3) | 0);
       for (let y = 0; y < h; y++)
-        px(ctx, x, y, shade("#5fa83a", 1 + (rng() - 0.5) * 0.3));
+        px(ctx, x, y, shade("#5fa83a", 1 + (rng() - 0.5) * 0.18));
     }
   },
-  dirt(ctx, rng) { speckle(ctx, "#7a5b3a", 0.35, rng); scatter(ctx, 56, "#5c4329", rng); },
-  stone(ctx, rng) { speckle(ctx, "#8a8a8a", 0.22, rng); scatter(ctx, 40, "#6f6f6f", rng, 0.15); },
-  cobblestone(ctx, rng) {
-    speckle(ctx, "#7d7d7d", 0.18, rng);
-    const cell = 10;
-    for (let gy = 0; gy < TILE; gy += cell)
-      for (let gx = 0; gx < TILE; gx += cell) {
-        const ox = (rng() * 3) | 0, oy = (rng() * 3) | 0, s = cell - 2;
-        for (let y = 0; y < s; y++)
-          for (let x = 0; x < s; x++) {
-            const edge = x === 0 || y === 0 || x === s - 1 || y === s - 1;
-            const px2 = gx + x + ox, py2 = gy + y + oy;
-            if (px2 < TILE && py2 < TILE)
-              px(ctx, px2, py2, shade("#7d7d7d", edge ? 0.6 : 1 + (rng() - 0.5) * 0.2));
-          }
-      }
+  dirt(ctx, rng) {
+    fill(ctx, "#7a5b3a");
+    noise(ctx, "#7a5b3a", 0.22, rng);
+    speckles(ctx, 70, "#5c4329", rng);
+    speckles(ctx, 30, "#8e6c47", rng);
   },
-  sand(ctx, rng) { speckle(ctx, "#e3d6a3", 0.16, rng); scatter(ctx, 48, "#cdbf86", rng); },
+  stone(ctx, rng) {
+    fill(ctx, "#8a8a8a");
+    noise(ctx, "#8a8a8a", 0.12, rng);
+    // a few darker patches
+    for (let i = 0; i < 6; i++) {
+      const cx = (rng() * TILE) | 0, cy = (rng() * TILE) | 0;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++)
+          if (rng() < 0.55)
+            px(ctx, (cx + dx + TILE) % TILE, (cy + dy + TILE) % TILE,
+               shade("#6f6f6f", 1 + (rng() - 0.5) * 0.2));
+    }
+  },
+  cobblestone(ctx, rng) {
+    // mortar background
+    fill(ctx, "#4a4a4a");
+    // stones: 3 rows of irregular rounded rectangles
+    const rows = [
+      [0, 11, 16, 9], [16, 0, 16, 12],
+      [0, 0, 12, 11], [12, 12, 12, 8], [24, 12, 8, 11],
+      [0, 20, 14, 12], [14, 20, 18, 12],
+    ];
+    for (const [x, y, w, h] of rows) {
+      const base = shade("#8a8a8a", 1 + (rng() - 0.5) * 0.15);
+      rect(ctx, x + 1, y + 1, w - 2, h - 2, base);
+      // highlight + shadow
+      rect(ctx, x + 1, y + 1, w - 2, 1, shade("#a0a0a0", 1));
+      rect(ctx, x + 1, y + h - 2, w - 2, 1, shade("#5e5e5e", 1));
+      // grain
+      for (let i = 0; i < 6; i++)
+        px(ctx, x + 2 + ((rng() * (w - 4)) | 0), y + 2 + ((rng() * (h - 4)) | 0),
+           shade(base, 0.85));
+    }
+  },
+  sand(ctx, rng) {
+    fill(ctx, "#e3d6a3");
+    noise(ctx, "#e3d6a3", 0.08, rng);
+    speckles(ctx, 60, "#cdbf86", rng);
+    speckles(ctx, 25, "#f0e5b8", rng);
+  },
   gravel(ctx, rng) {
-    speckle(ctx, "#8d847f", 0.3, rng);
-    scatter(ctx, 90, "#6b635f", rng); scatter(ctx, 70, "#a59c97", rng);
+    fill(ctx, "#8d847f");
+    noise(ctx, "#8d847f", 0.25, rng);
+    speckles(ctx, 60, "#6b635f", rng);
+    speckles(ctx, 50, "#a59c97", rng);
+    speckles(ctx, 18, "#444042", rng);
   },
   water(ctx, rng) {
-    speckle(ctx, "#3a6fbb", 0.18, rng);
-    for (let y = 0; y < TILE; y++)
+    fill(ctx, "#3a6fbb");
+    noise(ctx, "#3a6fbb", 0.12, rng);
+    // gentle horizontal waves
+    for (let y = 6; y < TILE; y += 9)
       for (let x = 0; x < TILE; x++)
-        if ((x + y) % 8 < 2) px(ctx, x, y, shade("#5b8dff", 1.15));
+        if (((x + (y * 3) + (rng() * 2 | 0)) % 6) < 2)
+          px(ctx, x, y, shade("#6aa2ff", 1.05));
   },
   log_side(ctx, rng) {
+    fill(ctx, "#6b4f2a");
+    // vertical bark stripes
     for (let x = 0; x < TILE; x++) {
-      const bark = 0.8 + Math.abs(Math.sin(x * 0.45)) * 0.4;
+      const bark = 0.78 + Math.abs(Math.sin(x * 0.7 + rng() * 0.4)) * 0.45;
       for (let y = 0; y < TILE; y++)
-        px(ctx, x, y, shade("#6b4f2a", bark + (rng() - 0.5) * 0.18));
+        px(ctx, x, y, shade("#6b4f2a", bark + (rng() - 0.5) * 0.12));
     }
+    // top/bottom ring caps
+    rect(ctx, 0, 0, TILE, 1, "#3e2a14");
+    rect(ctx, 0, TILE - 1, TILE, 1, "#3e2a14");
   },
-  log_top(ctx, rng) { rings(ctx, rng, "#b5945a", "#8a6c3c"); },
-  leaves(ctx, rng) { leafTile(ctx, rng, "#3f7d2c", 0.5); },
-  planks(ctx, rng) { plankTile(ctx, rng, "#b08344", "#7a5a2c"); },
+  log_top(ctx, rng) { rings(ctx, rng, "#b5945a", "#8a6c3c", "#6b4f2a"); },
+  leaves(ctx, rng) { leafTile(ctx, rng, "#3f7d2c", "#2e5e1f"); },
+  planks(ctx, rng) { plankTile(ctx, rng, "#b08344", "#7a5a2c", "#c89a5a"); },
   glass(ctx, rng) {
     ctx.clearRect(0, 0, TILE, TILE);
-    ctx.strokeStyle = "rgba(220,240,255,0.9)";
+    ctx.strokeStyle = "rgba(220,240,255,0.95)";
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, TILE - 2, TILE - 2);
-    ctx.strokeStyle = "rgba(220,240,255,0.5)";
-    ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(TILE * 0.5, TILE * 0.5); ctx.stroke();
+    ctx.strokeStyle = "rgba(220,240,255,0.45)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(14, 14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(TILE - 5, TILE - 12); ctx.lineTo(TILE - 12, TILE - 5); ctx.stroke();
   },
   bedrock(ctx, rng) {
-    for (let y = 0; y < TILE; y++)
-      for (let x = 0; x < TILE; x++)
-        px(ctx, x, y, shade("#2b2b2b", 0.6 + rng() * 0.9));
+    fill(ctx, "#2b2b2b");
+    // irregular block-y darker chunks
+    for (let i = 0; i < 8; i++) {
+      const w = 6 + ((rng() * 8) | 0), h = 4 + ((rng() * 6) | 0);
+      const x = (rng() * (TILE - w)) | 0, y = (rng() * (TILE - h)) | 0;
+      rect(ctx, x, y, w, h, shade("#3a3a3a", 1 + (rng() - 0.5) * 0.4));
+      rect(ctx, x, y, w, 1, "#1a1a1a");
+      rect(ctx, x, y + h - 1, w, 1, "#1a1a1a");
+    }
   },
   path(ctx, rng) {
-    speckle(ctx, "#6f5536", 0.25, rng);
-    ctx.strokeStyle = shade("#5c4329", 1); ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, TILE - 2, TILE - 2);
+    fill(ctx, "#6f5536");
+    noise(ctx, "#6f5536", 0.22, rng);
+    speckles(ctx, 40, "#5c4329", rng);
+    rect(ctx, 0, 0, TILE, 2, shade("#8a6f47", 1));
   },
   sandstone(ctx, rng) {
-    speckle(ctx, "#dccb92", 0.1, rng);
-    for (let y = 0; y < TILE; y += 9)
-      for (let x = 0; x < TILE; x++) px(ctx, x, y, shade("#bfa869", 1));
+    fill(ctx, "#dccb92");
+    noise(ctx, "#dccb92", 0.07, rng);
+    for (let y = 0; y < TILE; y += 10)
+      rect(ctx, 0, y, TILE, 1, "#bfa869");
+    // subtle vertical lines
+    for (let x = 0; x < TILE; x += 14)
+      rect(ctx, x, 1, 1, TILE - 2, shade("#cdb87b", 0.95));
   },
-  orange(ctx, rng) { speckle(ctx, "#d8731f", 0.16, rng); scatter(ctx, 40, "#b85a13", rng); },
+  orange(ctx, rng) {
+    fill(ctx, "#d8731f");
+    noise(ctx, "#d8731f", 0.1, rng);
+    speckles(ctx, 30, "#b85a13", rng);
+    speckles(ctx, 15, "#ec8b35", rng);
+  },
   cactus(ctx, rng) {
-    for (let y = 0; y < TILE; y++)
-      for (let x = 0; x < TILE; x++) {
-        const rib = (x % 10) < 4;
-        px(ctx, x, y, shade(rib ? "#3a5e29" : "#4f7d3a", 1 + (rng() - 0.5) * 0.18));
-      }
-    scatter(ctx, 34, "#e4ecbf", rng);
+    for (let x = 0; x < TILE; x++) {
+      const rib = x < 4 || x >= TILE - 4;
+      for (let y = 0; y < TILE; y++)
+        px(ctx, x, y, shade(rib ? "#3a5e29" : "#4f7d3a", 1 + (rng() - 0.5) * 0.16));
+    }
+    // spines
+    for (let y = 4; y < TILE; y += 6)
+      for (const x of [1, TILE - 2]) px(ctx, x, y, "#e4ecbf");
   },
   birch_log_side(ctx, rng) {
-    speckle(ctx, "#d8cfb6", 0.12, rng);
-    for (let i = 0; i < 22; i++) {
-      const y = (rng() * TILE) | 0, w = (2 + rng() * 6) | 0, x0 = (rng() * TILE) | 0;
+    fill(ctx, "#d8cfb6");
+    noise(ctx, "#d8cfb6", 0.06, rng);
+    // dark birch flecks
+    for (let i = 0; i < 14; i++) {
+      const y = (rng() * TILE) | 0, w = 4 + ((rng() * 6) | 0), x0 = (rng() * TILE) | 0;
       for (let x = 0; x < w; x++) px(ctx, (x0 + x) % TILE, y, "#3a3128");
     }
+    rect(ctx, 0, 0, TILE, 1, "#3a3128");
+    rect(ctx, 0, TILE - 1, TILE, 1, "#3a3128");
   },
-  birch_log_top(ctx, rng) { rings(ctx, rng, "#e6dcc0", "#cdbf99"); },
-  birch_planks(ctx, rng) { plankTile(ctx, rng, "#d2c3a0", "#a9966f"); },
-  birch_leaves(ctx, rng) { leafTile(ctx, rng, "#73ad53", 0.45); },
+  birch_log_top(ctx, rng) { rings(ctx, rng, "#e6dcc0", "#cdbf99", "#a89770"); },
+  birch_planks(ctx, rng) { plankTile(ctx, rng, "#d2c3a0", "#a9966f", "#e2d4b0"); },
+  birch_leaves(ctx, rng) { leafTile(ctx, rng, "#73ad53", "#588b3d"); },
   spruce_log_side(ctx, rng) {
+    fill(ctx, "#4a3520");
     for (let x = 0; x < TILE; x++) {
-      const bark = 0.8 + Math.abs(Math.sin(x * 0.45)) * 0.4;
+      const bark = 0.78 + Math.abs(Math.sin(x * 0.65)) * 0.45;
       for (let y = 0; y < TILE; y++)
-        px(ctx, x, y, shade("#4a3520", bark + (rng() - 0.5) * 0.2));
+        px(ctx, x, y, shade("#4a3520", bark + (rng() - 0.5) * 0.18));
     }
+    rect(ctx, 0, 0, TILE, 1, "#2a1d11");
+    rect(ctx, 0, TILE - 1, TILE, 1, "#2a1d11");
   },
-  spruce_log_top(ctx, rng) { rings(ctx, rng, "#6b5236", "#503c26"); },
-  spruce_planks(ctx, rng) { plankTile(ctx, rng, "#6e5436", "#4d3a25"); },
-  spruce_leaves(ctx, rng) { leafTile(ctx, rng, "#2f5e2a", 0.5); },
+  spruce_log_top(ctx, rng) { rings(ctx, rng, "#6b5236", "#503c26", "#3a2a18"); },
+  spruce_planks(ctx, rng) { plankTile(ctx, rng, "#6e5436", "#4d3a25", "#856947"); },
+  spruce_leaves(ctx, rng) { leafTile(ctx, rng, "#2f5e2a", "#22441e"); },
   netherrack(ctx, rng) {
-    speckle(ctx, "#7a2a26", 0.3, rng);
-    scatter(ctx, 96, "#4f1a18", rng); scatter(ctx, 70, "#9c3b34", rng);
+    fill(ctx, "#7a2a26");
+    noise(ctx, "#7a2a26", 0.22, rng);
+    // small darker pockmarks
+    for (let i = 0; i < 8; i++) {
+      const cx = (rng() * TILE) | 0, cy = (rng() * TILE) | 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (rng() < 0.7) px(ctx, (cx + dx + TILE) % TILE, (cy + dy + TILE) % TILE, "#4f1a18");
+    }
+    speckles(ctx, 30, "#9c3b34", rng);
   },
   slime(ctx, rng) {
-    speckle(ctx, "#6fbf5a", 0.2, rng);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#3f8a36"; ctx.strokeRect(5, 5, TILE - 10, TILE - 10);
-    ctx.strokeStyle = "#9fe089"; ctx.strokeRect(9, 9, TILE - 18, TILE - 18);
+    fill(ctx, "#6fbf5a");
+    noise(ctx, "#6fbf5a", 0.16, rng);
+    // inner darker translucent core
+    ctx.strokeStyle = "#3f8a36"; ctx.lineWidth = 2;
+    ctx.strokeRect(5, 5, TILE - 10, TILE - 10);
+    ctx.strokeStyle = "#9fe089"; ctx.lineWidth = 2;
+    ctx.strokeRect(10, 10, TILE - 20, TILE - 20);
   },
-  wool(ctx, rng) { speckle(ctx, "#ececec", 0.14, rng); },
-  redstone_block(ctx, rng) { speckle(ctx, "#c0302a", 0.22, rng); scatter(ctx, 56, "#ff5a4f", rng); },
+  wool(ctx, rng) {
+    fill(ctx, "#ececec");
+    noise(ctx, "#ececec", 0.08, rng);
+    // a few tufts
+    speckles(ctx, 24, "#d2d2d2", rng);
+  },
+  redstone_block(ctx, rng) {
+    fill(ctx, "#c0302a");
+    noise(ctx, "#c0302a", 0.14, rng);
+    // brighter crystal dots in a loose grid
+    for (let y = 4; y < TILE; y += 7)
+      for (let x = 4; x < TILE; x += 7) {
+        const ox = (rng() * 3) | 0, oy = (rng() * 3) | 0;
+        px(ctx, x + ox, y + oy, "#ff5a4f");
+        px(ctx, x + ox + 1, y + oy, "#ff8a7e");
+      }
+  },
   redstone_dust(ctx, rng) {
-    speckle(ctx, "#3a3a3a", 0.2, rng);
-    ctx.strokeStyle = "#c81e10"; ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(TILE / 2, 0); ctx.lineTo(TILE / 2, TILE);
-    ctx.moveTo(0, TILE / 2); ctx.lineTo(TILE, TILE / 2);
-    ctx.stroke();
-    ctx.fillStyle = "#ff5a4f"; ctx.fillRect(TILE / 2 - 3, TILE / 2 - 3, 6, 6);
+    fill(ctx, "#3a3a3a");
+    noise(ctx, "#3a3a3a", 0.18, rng);
+    // a red plus / wire cross
+    ctx.fillStyle = "#c81e10";
+    rect(ctx, TILE / 2 - 2, 2, 4, TILE - 4, "#c81e10");
+    rect(ctx, 2, TILE / 2 - 2, TILE - 4, 4, "#c81e10");
+    rect(ctx, TILE / 2 - 3, TILE / 2 - 3, 6, 6, "#ff5a4f");
   },
   lever(ctx, rng) {
-    speckle(ctx, "#8a8a8a", 0.2, rng);
-    rect(ctx, TILE / 2 - 2, 6 * U, 4, 9 * U, "#6b4f2a");
-    rect(ctx, TILE / 2 - 4, 3 * U, 8, 6 * U, "#cacaca");
+    fill(ctx, "#8a8a8a");
+    noise(ctx, "#8a8a8a", 0.15, rng);
+    // base plate
+    rect(ctx, 7, 18, 18, 11, "#6f6f6f");
+    rect(ctx, 7, 18, 18, 1, "#a0a0a0");
+    // stick
+    rect(ctx, TILE / 2 - 2, 6, 4, 16, "#6b4f2a");
+    // ball
+    rect(ctx, TILE / 2 - 4, 3, 8, 6, "#cacaca");
+    rect(ctx, TILE / 2 - 4, 3, 8, 1, "#ffffff");
   },
   repeater(ctx, rng) {
-    speckle(ctx, "#b4b0aa", 0.14, rng);
-    rect(ctx, TILE / 2 - 2, 3 * U, 4, TILE - 6 * U, "#c81e10");
-    rect(ctx, 8 * U, TILE * 0.55, 5 * U, 5, "#7a2a26");
-    rect(ctx, TILE - 13 * U, TILE * 0.3, 5 * U, 5, "#7a2a26");
+    fill(ctx, "#b4b0aa");
+    noise(ctx, "#b4b0aa", 0.1, rng);
+    // central wire
+    rect(ctx, TILE / 2 - 2, 6, 4, TILE - 12, "#c81e10");
+    // two torches
+    rect(ctx, 10, 18, 3, 5, "#6b4f2a"); rect(ctx, 9, 16, 5, 3, "#ff5a4f");
+    rect(ctx, 19, 10, 3, 5, "#6b4f2a"); rect(ctx, 18, 8, 5, 3, "#ff5a4f");
   },
   piston(ctx, rng) {
-    speckle(ctx, "#9a8a6a", 0.16, rng);
-    ctx.strokeStyle = "#5a4a2c"; ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, TILE - 2, TILE - 2);
+    // planky face with a darker frame
+    fill(ctx, "#b08344");
+    noise(ctx, "#b08344", 0.12, rng);
+    rect(ctx, 0, 0, TILE, 3, "#7a5a2c");
+    rect(ctx, 0, TILE - 3, TILE, 3, "#7a5a2c");
+    rect(ctx, 0, 0, 3, TILE, "#7a5a2c");
+    rect(ctx, TILE - 3, 0, 3, TILE, "#7a5a2c");
+    // central wood-ring detail
+    const c = TILE / 2 - 0.5;
+    for (let y = 5; y < TILE - 5; y++)
+      for (let x = 5; x < TILE - 5; x++) {
+        const d = ((Math.hypot(x - c, y - c)) | 0);
+        if (d % 3 === 0) px(ctx, x, y, "#8a6c3c");
+      }
   },
   piston_head(ctx, rng) {
-    speckle(ctx, "#c2b48a", 0.14, rng);
-    rect(ctx, 0, 0, TILE, 8 * U, "#8a7a52");
-    rect(ctx, TILE / 2 - 4, 8 * U, 8, TILE - 8 * U, "#5a4a2c");
+    fill(ctx, "#c2b48a");
+    noise(ctx, "#c2b48a", 0.1, rng);
+    rect(ctx, 0, 0, TILE, 12, "#8a7a52");
+    rect(ctx, 0, 0, TILE, 2, "#a99860");
+    rect(ctx, TILE / 2 - 4, 12, 8, TILE - 12, "#5a4a2c");
+    rect(ctx, TILE / 2 - 4, 12, 8, 2, "#3e3318");
   },
   sticky_piston(ctx, rng) {
-    speckle(ctx, "#9a8a6a", 0.16, rng);
-    rect(ctx, 8 * U, 8 * U, TILE - 16 * U, TILE - 16 * U, "#6fbf5a");
-    ctx.strokeStyle = "#5a4a2c"; ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, TILE - 2, TILE - 2);
+    fill(ctx, "#b08344");
+    noise(ctx, "#b08344", 0.12, rng);
+    rect(ctx, 0, 0, TILE, 3, "#7a5a2c");
+    rect(ctx, 0, TILE - 3, TILE, 3, "#7a5a2c");
+    rect(ctx, 0, 0, 3, TILE, "#7a5a2c");
+    rect(ctx, TILE - 3, 0, 3, TILE, "#7a5a2c");
+    // slime patch in the middle
+    rect(ctx, 7, 7, TILE - 14, TILE - 14, "#6fbf5a");
+    ctx.strokeStyle = "#3f8a36"; ctx.lineWidth = 1;
+    ctx.strokeRect(7.5, 7.5, TILE - 15, TILE - 15);
+    ctx.strokeStyle = "#9fe089";
+    ctx.strokeRect(11.5, 11.5, TILE - 23, TILE - 23);
   },
   portal(ctx, rng) {
+    // vertical wavy bands of purple, like a portal interior
     for (let y = 0; y < TILE; y++)
       for (let x = 0; x < TILE; x++) {
-        const v = 0.5 + 0.5 * Math.sin((x + y) * 0.4 + rng() * 0.6);
-        px(ctx, x, y, shade("#7b3fb0", 0.6 + v * 0.8));
+        const v = 0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.18 + rng() * 0.4);
+        px(ctx, x, y, shade("#7b3fb0", 0.55 + v * 0.9));
       }
+    rect(ctx, 0, 0, TILE, 1, "#3a1a52");
+    rect(ctx, 0, TILE - 1, TILE, 1, "#3a1a52");
+    rect(ctx, 0, 0, 1, TILE, "#3a1a52");
+    rect(ctx, TILE - 1, 0, 1, TILE, "#3a1a52");
   },
 };
 
-// shared sub-painters
-function rings(ctx, rng, base, dark) {
-  speckle(ctx, base, 0.16, rng);
+// ---------------- shared sub-painters ---------------------------------------
+function rings(ctx, rng, base, mid, dark) {
+  fill(ctx, base);
+  noise(ctx, base, 0.1, rng);
   const c = TILE / 2 - 0.5;
   for (let y = 0; y < TILE; y++)
-    for (let x = 0; x < TILE; x++)
-      if (((Math.hypot(x - c, y - c) / U) | 0) % 3 === 0) px(ctx, x, y, shade(dark, 1));
+    for (let x = 0; x < TILE; x++) {
+      const d = Math.hypot(x - c, y - c) | 0;
+      if (d % 4 === 0) px(ctx, x, y, mid);
+      else if (d % 4 === 2) px(ctx, x, y, shade(base, 0.93));
+    }
+  // pith dot
+  rect(ctx, ((TILE / 2) | 0) - 1, ((TILE / 2) | 0) - 1, 2, 2, dark);
 }
-function leafTile(ctx, rng, base, vary) {
+function leafTile(ctx, rng, light, dark) {
   for (let y = 0; y < TILE; y++)
     for (let x = 0; x < TILE; x++) {
-      if (rng() < 0.12) { ctx.clearRect(x, y, 1, 1); continue; }
-      px(ctx, x, y, shade(base, 1 + (rng() - 0.5) * vary));
+      if (rng() < 0.10) { ctx.clearRect(x, y, 1, 1); continue; }
+      const r = rng();
+      const c = r < 0.35 ? dark : light;
+      px(ctx, x, y, shade(c, 1 + (rng() - 0.5) * 0.3));
     }
 }
-function plankTile(ctx, rng, base, dark) {
-  for (let y = 0; y < TILE; y++)
-    for (let x = 0; x < TILE; x++)
-      px(ctx, x, y, shade(base, 1 + (rng() - 0.5) * 0.13));
-  for (let y = 0; y < TILE; y += 8) rect(ctx, 0, y, TILE, 1, shade(dark, 1));
-  for (let x = 7 * U; x < TILE; x += 16 * U) rect(ctx, x, 0, 1, TILE, shade(dark, 1));
+function plankTile(ctx, rng, base, dark, light) {
+  fill(ctx, base);
+  noise(ctx, base, 0.08, rng);
+  // four horizontal planks
+  for (let y = 0; y < TILE; y += 8) {
+    rect(ctx, 0, y, TILE, 1, dark);
+    rect(ctx, 0, y + 1, TILE, 1, light);
+  }
+  // staggered vertical seams
+  for (let row = 0; row < 4; row++) {
+    const seamX = (row % 2 === 0) ? 11 : 22;
+    rect(ctx, seamX, row * 8, 1, 8, dark);
+  }
 }
 
+// ---------------- atlas -----------------------------------------------------
 const TILE_NAMES = [
   "grass_top", "grass_side", "dirt", "stone", "cobblestone", "sand",
   "gravel", "water", "log_side", "log_top", "leaves", "planks",
@@ -253,7 +407,12 @@ export function buildAtlas() {
   return { texture: tex, uv, tileNames: TILE_NAMES };
 }
 
+// ---------------- icon cache (optimisation) ---------------------------------
+const iconCache = new Map();
 export function tileIcon(name, size = 36) {
+  const key = name + ":" + size;
+  const cached = iconCache.get(key);
+  if (cached) return cached;
   const ctx = tileCtx();
   painters[name](ctx, makeRng(0x1234 + TILE_NAMES.indexOf(name) * 9871));
   const out = document.createElement("canvas");
@@ -261,22 +420,26 @@ export function tileIcon(name, size = 36) {
   const o = out.getContext("2d");
   o.imageSmoothingEnabled = false;
   o.drawImage(ctx.canvas, 0, 0, size, size);
+  iconCache.set(key, out);
   return out;
 }
 
+let armorIconCache = null;
 export function woodenArmorIcon(size = 40) {
+  if (armorIconCache && armorIconCache.width === size) return armorIconCache;
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const g = c.getContext("2d");
   g.imageSmoothingEnabled = false;
   const u = size / 16;
   const plank = "#b08344", dark = "#7a5a2c", light = "#c89a5a";
-  const fill = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * u, y * u, w * u, h * u); };
-  fill(2, 3, 4, 3, plank); fill(10, 3, 4, 3, plank);
-  fill(4, 5, 8, 8, plank);
-  fill(4, 7, 8, 1, dark); fill(4, 10, 8, 1, dark);
-  fill(2, 4, 4, 1, light); fill(10, 4, 4, 1, light);
+  const f = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * u, y * u, w * u, h * u); };
+  f(2, 3, 4, 3, plank); f(10, 3, 4, 3, plank);
+  f(4, 5, 8, 8, plank);
+  f(4, 7, 8, 1, dark); f(4, 10, 8, 1, dark);
+  f(2, 4, 4, 1, light); f(10, 4, 4, 1, light);
   g.strokeStyle = dark; g.lineWidth = u;
   g.strokeRect(4 * u, 5 * u, 8 * u, 8 * u);
+  armorIconCache = c;
   return c;
 }
