@@ -746,6 +746,7 @@ function doBreak() {
   const id = world.getBlock(x, y, z);
   if (id === B.BEDROCK) return;
   remeshDirty(editBlock(x, y, z, B.AIR));
+  redstoneTimer = 0;                      // power may have changed
   if (gamemode === "survival") giveItem(id);
 }
 
@@ -758,6 +759,7 @@ function doPlace() {
     const m = world.meta.get(k) || {};
     m.on = !m.on;
     world.meta.set(k, m);
+    redstoneTimer = 0;                    // re-evaluate immediately
     return;
   }
   if (!r.prev) return;
@@ -776,16 +778,16 @@ function doPlace() {
 
   let meta = null;
   if (id === B.PISTON || id === B.STICKY_PISTON) {
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    const ax = Math.abs(dir.x), ay = Math.abs(dir.y), az = Math.abs(dir.z);
-    let facing = [0, 1, 0];
-    if (ax >= ay && ax >= az) facing = [Math.sign(dir.x) || 1, 0, 0];
-    else if (ay >= az) facing = [0, Math.sign(dir.y) || 1, 0];
-    else facing = [0, 0, Math.sign(dir.z) || 1];
+    // piston pushes outward from the surface you clicked
+    const facing = [
+      Math.sign(r.prev[0] - r.hit[0]),
+      Math.sign(r.prev[1] - r.hit[1]),
+      Math.sign(r.prev[2] - r.hit[2]),
+    ];
     meta = { facing, extended: false };
   }
   remeshDirty(editBlock(x, y, z, id, meta));
+  redstoneTimer = 0;                      // react to power change next frame
   if (gamemode === "survival") {
     slot.count--;
     if (slot.count <= 0) slot.id = B.AIR;

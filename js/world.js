@@ -48,9 +48,9 @@ export const BLOCKS = {
   [B.SLIME]:  { name: "Slime Block", all: "slime", solid: true, transparent: true },
   [B.WOOL]:   { name: "White Wool", all: "wool", solid: true },
   [B.REDSTONE_BLOCK]: { name: "Redstone Block", all: "redstone_block", solid: true },
-  [B.REDSTONE_DUST]:  { name: "Redstone Dust", all: "redstone_dust", solid: true },
-  [B.LEVER]:  { name: "Lever", all: "lever", solid: true },
-  [B.REPEATER]: { name: "Repeater", all: "repeater", solid: true },
+  [B.REDSTONE_DUST]:  { name: "Redstone Dust", all: "redstone_dust", solid: false, transparent: true },
+  [B.LEVER]:  { name: "Lever", all: "lever", solid: false, transparent: true },
+  [B.REPEATER]: { name: "Repeater", all: "repeater", solid: false, transparent: true },
   [B.PISTON]: { name: "Piston", all: "piston", solid: true },
   [B.STICKY_PISTON]: { name: "Sticky Piston", all: "sticky_piston", solid: true },
   [B.PISTON_HEAD]: { name: "Piston Head", all: "piston_head", solid: true },
@@ -74,6 +74,9 @@ const FACES = [
   { name: "nz", dir: [0,0,-1], n: [0,0,-1], light: 0.62, corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
 const FACE_KEY = { px: "side", nx: "side", py: "top", ny: "bottom", pz: "side", nz: "side" };
+
+// blocks rendered as a thin flat plate on the floor of their voxel cell
+const FLAT_BLOCKS = new Set([B.LEVER, B.REDSTONE_DUST, B.REPEATER]);
 
 export class World {
   constructor(seed, atlas, dimension = "overworld") {
@@ -308,8 +311,14 @@ export class World {
           if (id === B.AIR) continue;
           const block = BLOCKS[id];
           const wx = cx * CHUNK + x, wz = cz * CHUNK + z;
-          const target = block.liquid ? water : block.transparent ? cutout : opaque;
 
+          // flat overlay blocks (lever, dust, repeater) render as one quad
+          if (FLAT_BLOCKS.has(id)) {
+            this.pushFlatFace(cutout, x, wy - MIN_Y, z, faceTile(id, "top"));
+            continue;
+          }
+
+          const target = block.liquid ? water : block.transparent ? cutout : opaque;
           for (const f of FACES) {
             const nid = this.getBlock(wx + f.dir[0], wy + f.dir[1], wz + f.dir[2]);
             if (nid !== B.AIR) {
@@ -326,6 +335,25 @@ export class World {
       cutout: this.toGeometry(cutout),
       water:  this.toGeometry(water),
     };
+  }
+
+  // thin quad just above the floor of a voxel cell
+  pushFlatFace(t, x, y, z, tileName) {
+    const uv = this.atlas.uv[tileName];
+    const base = t.pos.length / 3;
+    const h = 0.06;
+    t.pos.push(
+      x, y + h, z,
+      x, y + h, z + 1,
+      x + 1, y + h, z + 1,
+      x + 1, y + h, z,
+    );
+    for (let i = 0; i < 4; i++) {
+      t.norm.push(0, 1, 0);
+      t.col.push(1, 1, 1);
+    }
+    t.uv.push(uv.u0, uv.v1, uv.u0, uv.v0, uv.u1, uv.v0, uv.u1, uv.v1);
+    t.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
   pushFace(t, x, y, z, f, tileName) {

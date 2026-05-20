@@ -250,34 +250,37 @@ const painters = {
       }
   },
   redstone_dust(ctx, rng) {
-    fill(ctx, "#3a3a3a");
-    noise(ctx, "#3a3a3a", 0.18, rng);
-    // a red plus / wire cross
-    ctx.fillStyle = "#c81e10";
-    rect(ctx, TILE / 2 - 2, 2, 4, TILE - 4, "#c81e10");
-    rect(ctx, 2, TILE / 2 - 2, TILE - 4, 4, "#c81e10");
+    // flat overlay
+    ctx.clearRect(0, 0, TILE, TILE);
+    rect(ctx, TILE / 2 - 2, 4, 4, TILE - 8, "#c81e10");
+    rect(ctx, 4, TILE / 2 - 2, TILE - 8, 4, "#c81e10");
     rect(ctx, TILE / 2 - 3, TILE / 2 - 3, 6, 6, "#ff5a4f");
+    rect(ctx, TILE / 2 - 1, TILE / 2 - 1, 2, 2, "#ffb8a8");
   },
   lever(ctx, rng) {
-    fill(ctx, "#8a8a8a");
-    noise(ctx, "#8a8a8a", 0.15, rng);
-    // base plate
-    rect(ctx, 7, 18, 18, 11, "#6f6f6f");
-    rect(ctx, 7, 18, 18, 1, "#a0a0a0");
+    // drawn as a flat overlay (transparent background)
+    ctx.clearRect(0, 0, TILE, TILE);
+    // cobble base plate
+    rect(ctx, 9, 19, 14, 10, "#6f6f6f");
+    rect(ctx, 9, 19, 14, 1, "#a0a0a0");
+    rect(ctx, 9, 28, 14, 1, "#4a4a4a");
     // stick
-    rect(ctx, TILE / 2 - 2, 6, 4, 16, "#6b4f2a");
-    // ball
-    rect(ctx, TILE / 2 - 4, 3, 8, 6, "#cacaca");
-    rect(ctx, TILE / 2 - 4, 3, 8, 1, "#ffffff");
+    rect(ctx, TILE / 2 - 1, 8, 3, 14, "#6b4f2a");
+    // knob
+    rect(ctx, TILE / 2 - 3, 4, 6, 5, "#cacaca");
+    rect(ctx, TILE / 2 - 3, 4, 6, 1, "#ffffff");
   },
   repeater(ctx, rng) {
-    fill(ctx, "#b4b0aa");
-    noise(ctx, "#b4b0aa", 0.1, rng);
+    ctx.clearRect(0, 0, TILE, TILE);
+    // smooth-stone slab
+    rect(ctx, 3, 3, TILE - 6, TILE - 6, "#b4b0aa");
+    rect(ctx, 3, 3, TILE - 6, 1, "#cac6c0");
+    rect(ctx, 3, TILE - 4, TILE - 6, 1, "#85827d");
     // central wire
-    rect(ctx, TILE / 2 - 2, 6, 4, TILE - 12, "#c81e10");
-    // two torches
-    rect(ctx, 10, 18, 3, 5, "#6b4f2a"); rect(ctx, 9, 16, 5, 3, "#ff5a4f");
-    rect(ctx, 19, 10, 3, 5, "#6b4f2a"); rect(ctx, 18, 8, 5, 3, "#ff5a4f");
+    rect(ctx, TILE / 2 - 1, 10, 3, TILE - 20, "#c81e10");
+    // two torches (small base + bright top)
+    rect(ctx, 10, 20, 2, 4, "#6b4f2a"); rect(ctx, 9, 19, 4, 2, "#ff5a4f");
+    rect(ctx, 20, 12, 2, 4, "#6b4f2a"); rect(ctx, 19, 11, 4, 2, "#ff5a4f");
   },
   piston(ctx, rng) {
     // planky face with a darker frame
