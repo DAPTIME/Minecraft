@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>DevCraft</title>
 <link rel="stylesheet" href="style.css" />
+<script>
+  // honour ?reset=1 from reset-cache.bat / reset-cache.command:
+  // wipe saved settings BEFORE the ES modules load.
+  if (location.search.indexOf("reset") !== -1) {
+    try { localStorage.clear(); } catch (e) {}
+  }
+</script>
 </head>
 <body>
 <div id="game">

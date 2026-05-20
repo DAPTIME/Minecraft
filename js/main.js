@@ -1026,4 +1026,6 @@ function loop() {
   renderer.render(scene, camera);
 }
 applySettings();
+if (location.search.indexOf("reset") !== -1)
+  toast("Settings reset and cache flushed");
 loop();
