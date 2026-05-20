@@ -22,11 +22,11 @@ open_browser() {
 if command -v python3 >/dev/null 2>&1; then
   open_browser &
   echo "DevCraft is running. Close this window to quit."
-  python3 -m http.server "$PORT"
+  python3 serve.py "$PORT"
 elif command -v python >/dev/null 2>&1; then
   open_browser &
   echo "DevCraft is running. Close this window to quit."
-  python -m http.server "$PORT"
+  python serve.py "$PORT"
 else
   echo "Python 3 is required but was not found."
   echo "Install it from https://www.python.org/downloads/ and run this again."

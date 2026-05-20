@@ -10,12 +10,12 @@ echo.
 
 where python >nul 2>nul
 if %errorlevel%==0 (
-  start "DevCraft Server - close this window to quit" cmd /k python -m http.server %PORT%
+  start "DevCraft Server - close this window to quit" cmd /k python serve.py %PORT%
   goto open
 )
 where py >nul 2>nul
 if %errorlevel%==0 (
-  start "DevCraft Server - close this window to quit" cmd /k py -m http.server %PORT%
+  start "DevCraft Server - close this window to quit" cmd /k py serve.py %PORT%
   goto open
 )
 

@@ -25,6 +25,7 @@ function shade(hex, m) {
 }
 function fill(ctx, color) { rect(ctx, 0, 0, TILE, TILE, color); }
 function noise(ctx, base, amp, rng) {
+  amp *= 0.5;                        // damp overall noise for cleaner textures
   for (let y = 0; y < TILE; y++)
     for (let x = 0; x < TILE; x++)
       px(ctx, x, y, shade(base, 1 + (rng() - 0.5) * amp));

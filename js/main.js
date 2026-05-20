@@ -778,12 +778,16 @@ function doPlace() {
 
   let meta = null;
   if (id === B.PISTON || id === B.STICKY_PISTON) {
-    // piston pushes outward from the surface you clicked
-    const facing = [
-      Math.sign(r.prev[0] - r.hit[0]),
-      Math.sign(r.prev[1] - r.hit[1]),
-      Math.sign(r.prev[2] - r.hit[2]),
-    ];
+    // piston pushes outward from the clicked face — take the dominant axis
+    // of (r.prev - r.hit) so the facing is always axis-aligned
+    const dx = r.prev[0] - r.hit[0];
+    const dy = r.prev[1] - r.hit[1];
+    const dz = r.prev[2] - r.hit[2];
+    const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+    let facing;
+    if (ax >= ay && ax >= az) facing = [Math.sign(dx) || 1, 0, 0];
+    else if (ay >= az)         facing = [0, Math.sign(dy) || 1, 0];
+    else                       facing = [0, 0, Math.sign(dz) || 1];
     meta = { facing, extended: false };
   }
   remeshDirty(editBlock(x, y, z, id, meta));

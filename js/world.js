@@ -352,7 +352,7 @@ export class World {
       t.norm.push(0, 1, 0);
       t.col.push(1, 1, 1);
     }
-    t.uv.push(uv.u0, uv.v1, uv.u0, uv.v0, uv.u1, uv.v0, uv.u1, uv.v1);
+    t.uv.push(uv.u0, uv.v0, uv.u0, uv.v1, uv.u1, uv.v1, uv.u1, uv.v0);
     t.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
