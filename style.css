@@ -82,6 +82,23 @@ body { font-family: "Trebuchet MS", Verdana, sans-serif; }
 }
 #toast.show { opacity: 1; }
 
+#chat-log {
+  position: absolute; left: 10px; bottom: 86px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-family: monospace; font-size: 14px; color: #fff;
+  text-shadow: 1px 1px 0 #000; pointer-events: none;
+  max-width: 60%; opacity: 0; transition: opacity .3s;
+}
+#chat-log.show { opacity: 1; }
+#chat-log div { background: rgba(0,0,0,0.4); padding: 1px 5px; }
+#chat-input {
+  position: absolute; left: 10px; bottom: 60px; width: 58%;
+  font-family: monospace; font-size: 15px; padding: 6px 8px;
+  background: rgba(0,0,0,0.75); color: #fff;
+  border: 1px solid #999; z-index: 11;
+}
+#chat-input.hidden { display: none; }
+
 /* Overlays */
 .overlay {
   position: absolute; inset: 0;
@@ -124,3 +141,26 @@ body { font-family: "Trebuchet MS", Verdana, sans-serif; }
 }
 .armor-slot canvas { width: 56px; height: 56px; image-rendering: pixelated; }
 .hint { color: #999; font-size: 13px; }
+
+/* Settings */
+#settings-body {
+  display: flex; gap: 28px; flex-wrap: wrap; justify-content: center;
+  max-width: 720px;
+}
+.set-section { min-width: 320px; }
+.set-section h3 {
+  color: #7ac74f; border-bottom: 1px solid #3a4a2e;
+  padding-bottom: 4px; margin-bottom: 8px;
+}
+.set-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 5px 0; color: #ddd; font-size: 14px;
+}
+.set-row input[type=range] { flex: 1; max-width: 160px; }
+.set-val { width: 38px; text-align: right; color: #fff; font-family: monospace; }
+.key-btn {
+  padding: 4px 14px; font-size: 13px; min-width: 90px;
+  background: #2c3320; color: #fff; border: 2px solid #3a4a2e;
+  border-radius: 3px; cursor: pointer;
+}
+.key-btn:hover { border-color: #7ac74f; }

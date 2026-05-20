@@ -1,0 +1,30 @@
+{
+  "name": "devcraft",
+  "version": "1.1.0",
+  "description": "DevCraft - an original voxel sandbox",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.devcraft.app",
+    "productName": "DevCraft",
+    "files": [
+      "index.html",
+      "style.css",
+      "js/**/*",
+      "electron-main.js"
+    ],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg", "category": "public.app-category.games" },
+    "linux": { "target": "AppImage", "category": "Game" }
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

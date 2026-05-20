@@ -105,6 +105,20 @@ export class World {
     return fbm(wx, wz, this.seed + 555, 3, 0.0045) > 0.6 ? "desert" : "plains";
   }
 
+  // would a village generate at this (anchor) chunk?
+  villageAt(cx, cz) {
+    const m = (v, n) => ((v % n) + n) % n;
+    if (m(cx, 4) !== 0 || m(cz, 4) !== 0) return false;
+    if (this.biome(cx * CHUNK + 8, cz * CHUNK + 8) !== "plains") return false;
+    return makeRng(this.seed ^ (cx * 91138233) ^ (cz * 471232))() < 0.5;
+  }
+  villageNear(cx, cz) {
+    for (let ax = cx - 5; ax <= cx + 5; ax++)
+      for (let az = cz - 5; az <= cz + 5; az++)
+        if (this.villageAt(ax, az)) return true;
+    return false;
+  }
+
   // true => this voxel should be carved into a cave
   carveCave(wx, wy, wz) {
     if (this.nether) {
@@ -179,7 +193,8 @@ export class World {
       const trng = makeRng(this.seed ^ (cx * 70253) ^ (cz * 1992873));
       if (trng() < 0.6) generateDesertTemple(this, cx * CHUNK + 1, cz * CHUNK + 1, trng);
     }
-    if (m(cx, 6) === 3 && m(cz, 6) === 3) {
+    // pillager outposts never spawn close to a village
+    if (m(cx, 6) === 3 && m(cz, 6) === 3 && !this.villageNear(cx, cz)) {
       const org = makeRng(this.seed ^ (cx * 33119) ^ (cz * 60101));
       if (org() < 0.5) generatePillagerOutpost(this, cx * CHUNK + 5, cz * CHUNK + 5, org);
     }

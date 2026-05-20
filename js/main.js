@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { buildAtlas, tileIcon, woodenArmorIcon } from "./textures.js";
 import { World, B, BLOCKS, CHUNK, HEIGHT, MIN_Y, MAX_Y, SEA } from "./world.js";
 import { tickRedstone, REDSTONE_IDS } from "./redstone.js";
+import { Settings, buildSettingsUI } from "./settings.js";
 
 // =============================================================================
 // Renderer / scene
@@ -12,7 +13,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(Settings.fov, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
 scene.add(sun);
@@ -53,7 +54,7 @@ let SEED = 0;
 let worlds = null;          // { overworld, nether }
 let world = null;           // active World
 
-const RENDER_DIST = 5;
+let RENDER_DIST = Settings.renderDist;
 const chunkMeshes = new Map();
 const genQueue = [];
 const meshQueue = new Set();
@@ -122,29 +123,30 @@ function updatePlayer(dt) {
   const feet = world.getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.1), Math.floor(player.pos.z));
   player.inWater = feet === B.WATER;
 
-  const speed = player.flying ? 9 : keys.has("shiftleft") ? 6.5 : 4.3;
+  const kb = Settings.keys;
+  const speed = player.flying ? 9 : keys.has(kb.sprint) ? 6.5 : 4.3;
   const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const wish = new THREE.Vector3();
-  if (keys.has("keyw")) wish.add(fwd);
-  if (keys.has("keys")) wish.sub(fwd);
-  if (keys.has("keyd")) wish.add(right);
-  if (keys.has("keya")) wish.sub(right);
+  if (keys.has(kb.forward)) wish.add(fwd);
+  if (keys.has(kb.back)) wish.sub(fwd);
+  if (keys.has(kb.right)) wish.add(right);
+  if (keys.has(kb.left)) wish.sub(right);
   if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
   player.vel.x = wish.x;
   player.vel.z = wish.z;
 
   if (player.flying) {
     player.vel.y = 0;
-    if (keys.has("space")) player.vel.y = speed;
-    if (keys.has("shiftleft")) player.vel.y = -speed;
+    if (keys.has(kb.jump)) player.vel.y = speed;
+    if (keys.has(kb.sprint)) player.vel.y = -speed;
   } else {
     const grav = player.inWater ? 9 : 28;
     player.vel.y -= grav * dt;
     if (player.inWater) {
       player.vel.y = Math.max(player.vel.y, -4);
-      if (keys.has("space")) player.vel.y = 4;
-    } else if (keys.has("space") && player.onGround) {
+      if (keys.has(kb.jump)) player.vel.y = 4;
+    } else if (keys.has(kb.jump) && player.onGround) {
       player.vel.y = 9.2;
     }
   }
@@ -293,8 +295,6 @@ function raycastBlock() {
 // =============================================================================
 // Hotbar / inventory
 // =============================================================================
-const HOTBAR = [B.GRASS, B.STONE, B.PLANKS, B.LOG, B.GLASS, B.WOOL,
-  B.REDSTONE_DUST, B.PISTON, B.PORTAL];
 const ALL_BLOCKS = [
   B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.SAND, B.GRAVEL, B.SANDSTONE, B.ORANGE,
   B.LOG, B.PLANKS, B.LEAVES, B.BIRCH_LOG, B.BIRCH_PLANKS, B.BIRCH_LEAVES,
@@ -303,7 +303,10 @@ const ALL_BLOCKS = [
   B.REDSTONE_BLOCK, B.REDSTONE_DUST, B.LEVER, B.REPEATER,
   B.PISTON, B.STICKY_PISTON, B.PORTAL,
 ];
+// each hotbar slot: { id, count }.  id === B.AIR means empty.
+const hotbar = Array.from({ length: 9 }, () => ({ id: B.AIR, count: 0 }));
 let selected = 0;
+let gamemode = "survival";          // "survival" | "creative"
 
 const hotbarEl = document.getElementById("hotbar");
 function tileNameFor(id) {
@@ -312,30 +315,56 @@ function tileNameFor(id) {
 }
 function buildHotbar() {
   hotbarEl.innerHTML = "";
-  HOTBAR.forEach((id, i) => {
-    const slot = document.createElement("div");
-    slot.className = "slot" + (i === selected ? " active" : "");
-    slot.appendChild(tileIcon(tileNameFor(id)));
-    const label = document.createElement("div");
-    label.className = "label";
-    label.textContent = BLOCKS[id].name;
-    slot.appendChild(label);
-    slot.onclick = () => { selected = i; buildHotbar(); updateHand(); };
-    hotbarEl.appendChild(slot);
+  hotbar.forEach((slot, i) => {
+    const el = document.createElement("div");
+    el.className = "slot" + (i === selected ? " active" : "");
+    if (slot.id !== B.AIR) {
+      el.appendChild(tileIcon(tileNameFor(slot.id)));
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = BLOCKS[slot.id].name;
+      el.appendChild(label);
+      if (gamemode === "survival") {
+        const c = document.createElement("div");
+        c.className = "count";
+        c.textContent = slot.count;
+        el.appendChild(c);
+      }
+    }
+    el.onclick = () => { selected = i; buildHotbar(); updateHand(); };
+    hotbarEl.appendChild(el);
   });
+}
+
+// survival: add one block to the hotbar inventory
+function giveItem(id) {
+  if (id === B.AIR) return;
+  for (const s of hotbar)
+    if (s.id === id && s.count > 0 && s.count < 99) { s.count++; buildHotbar(); updateHand(); return; }
+  for (const s of hotbar)
+    if (s.id === B.AIR) { s.id = id; s.count = 1; buildHotbar(); updateHand(); return; }
 }
 
 const invGrid = document.getElementById("inv-grid");
 const armorSlotEl = document.getElementById("armor-slot");
+const invHint = document.querySelector("#inventory .hint");
 function buildInventory() {
   invGrid.innerHTML = "";
-  for (const id of ALL_BLOCKS) {
-    const cell = document.createElement("div");
-    cell.className = "inv-item";
-    cell.appendChild(tileIcon(tileNameFor(id), 40));
-    cell.title = BLOCKS[id].name;
-    cell.onclick = () => { HOTBAR[selected] = id; buildHotbar(); updateHand(); };
-    invGrid.appendChild(cell);
+  if (gamemode === "creative") {
+    for (const id of ALL_BLOCKS) {
+      const cell = document.createElement("div");
+      cell.className = "inv-item";
+      cell.appendChild(tileIcon(tileNameFor(id), 40));
+      cell.title = BLOCKS[id].name;
+      cell.onclick = () => {
+        hotbar[selected] = { id, count: 1 };
+        buildHotbar(); updateHand();
+      };
+      invGrid.appendChild(cell);
+    }
+    invHint.textContent = "Creative mode — click a block to put it on the hotbar.";
+  } else {
+    invHint.textContent = "Survival mode — break blocks to collect them. Open chat and type /gamemode creative to switch.";
   }
   armorSlotEl.innerHTML = "";
   if (armor.owned) armorSlotEl.appendChild(woodenArmorIcon(56));
@@ -345,8 +374,17 @@ function buildInventory() {
 
 const handEl = document.getElementById("hand");
 function updateHand() {
+  const id = hotbar[selected].id;
   handEl.style.backgroundImage =
-    `url(${tileIcon(tileNameFor(HOTBAR[selected]), 180).toDataURL()})`;
+    id === B.AIR ? "none" : `url(${tileIcon(tileNameFor(id), 180).toDataURL()})`;
+}
+
+function setGamemode(g) {
+  if (g !== "survival" && g !== "creative") return;
+  gamemode = g;
+  if (g === "survival") player.flying = false;
+  buildHotbar(); buildInventory(); updateHand();
+  chatMsg("Game mode set to " + g);
 }
 
 // =============================================================================
@@ -653,10 +691,21 @@ let mouseDownL = false, breakCd = 0;
 
 window.addEventListener("keydown", (e) => {
   const code = e.code.toLowerCase();
+  if (chatOpen) return;                       // chat input handles its own keys
   keys.add(code);
   if (!running) return;
-  if (code === "keye") { e.preventDefault(); toggleInventory(); }
-  if (code === "keyf") { player.flying = !player.flying; toast("Fly " + (player.flying ? "on" : "off")); }
+  if (!inventoryOpen && (code === "keyt" || code === "slash")) {
+    e.preventDefault();
+    openChat(code === "slash" ? "/" : "");
+    return;
+  }
+  if (code === Settings.keys.inventory) { e.preventDefault(); toggleInventory(); }
+  if (code === Settings.keys.fly) {
+    if (gamemode === "creative") {
+      player.flying = !player.flying;
+      toast("Fly " + (player.flying ? "on" : "off"));
+    } else toast("Flying is for creative mode");
+  }
   if (code === "keyr") equipArmor();
   if (code.startsWith("digit")) {
     const n = parseInt(code.slice(5));
@@ -674,8 +723,8 @@ canvas.addEventListener("mouseup", (e) => { if (e.button === 0) mouseDownL = fal
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 window.addEventListener("mousemove", (e) => {
   if (document.pointerLockElement !== canvas) return;
-  player.yaw -= e.movementX * 0.0024;
-  player.pitch -= e.movementY * 0.0024;
+  player.yaw -= e.movementX * 0.0024 * Settings.sensitivity;
+  player.pitch -= e.movementY * 0.0024 * Settings.sensitivity;
   player.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, player.pitch));
 });
 window.addEventListener("wheel", (e) => {
@@ -693,8 +742,10 @@ function doBreak() {
   const r = raycastBlock();
   if (!r) return;
   const [x, y, z] = r.hit;
-  if (world.getBlock(x, y, z) === B.BEDROCK) return;
+  const id = world.getBlock(x, y, z);
+  if (id === B.BEDROCK) return;
   remeshDirty(editBlock(x, y, z, B.AIR));
+  if (gamemode === "survival") giveItem(id);
 }
 
 function doPlace() {
@@ -711,9 +762,12 @@ function doPlace() {
   if (!r.prev) return;
   const [x, y, z] = r.prev;
   if (y > MAX_Y || y < MIN_Y) return;
+  const slot = hotbar[selected];
+  const id = slot.id;
+  if (id === B.AIR) return;
+  if (gamemode === "survival" && slot.count <= 0) return;
   const pminX = player.pos.x - P_RAD, pmaxX = player.pos.x + P_RAD;
   const pminZ = player.pos.z - P_RAD, pmaxZ = player.pos.z + P_RAD;
-  const id = HOTBAR[selected];
   if (BLOCKS[id].solid &&
       x + 1 > pminX && x < pmaxX && z + 1 > pminZ && z < pmaxZ &&
       y + 1 > player.pos.y && y < player.pos.y + P_HEIGHT) return;
@@ -731,7 +785,70 @@ function doPlace() {
     meta = { facing, extended: false };
   }
   remeshDirty(editBlock(x, y, z, id, meta));
+  if (gamemode === "survival") {
+    slot.count--;
+    if (slot.count <= 0) slot.id = B.AIR;
+    buildHotbar(); updateHand();
+  }
 }
+
+// =============================================================================
+// Chat
+// =============================================================================
+let chatOpen = false, chatFadeT = 0;
+const chatLog = document.getElementById("chat-log");
+const chatInput = document.getElementById("chat-input");
+const chatMessages = [];
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function chatMsg(text) {
+  chatMessages.push(text);
+  while (chatMessages.length > 8) chatMessages.shift();
+  chatLog.innerHTML = chatMessages.map(m => `<div>${escapeHtml(m)}</div>`).join("");
+  chatLog.classList.add("show");
+  clearTimeout(chatFadeT);
+  chatFadeT = setTimeout(() => { if (!chatOpen) chatLog.classList.remove("show"); }, 6000);
+}
+function openChat(prefill) {
+  chatOpen = true;
+  keys.clear();
+  chatInput.value = prefill || "";
+  chatInput.classList.remove("hidden");
+  chatLog.classList.add("show");
+  document.exitPointerLock();
+  chatInput.focus();
+}
+function closeChat() {
+  chatOpen = false;
+  chatInput.classList.add("hidden");
+  chatInput.blur();
+  if (running) canvas.requestPointerLock();
+}
+function runCommand(t) {
+  if (!t.startsWith("/")) { chatMsg("<You> " + t); return; }
+  const p = t.slice(1).trim().split(/\s+/);
+  if (p[0] === "gamemode") {
+    const g = (p[1] || "").toLowerCase();
+    if (g === "creative" || g === "c") setGamemode("creative");
+    else if (g === "survival" || g === "s") setGamemode("survival");
+    else chatMsg("Usage: /gamemode <creative|survival>");
+  } else if (p[0] === "help") {
+    chatMsg("Commands: /gamemode creative, /gamemode survival");
+  } else {
+    chatMsg("Unknown command: /" + p[0]);
+  }
+}
+chatInput.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.code === "Enter") {
+    const t = chatInput.value.trim();
+    if (t) runCommand(t);
+    closeChat();
+  } else if (e.code === "Escape") {
+    closeChat();
+  }
+});
 
 // =============================================================================
 // Inventory / menu
@@ -791,9 +908,26 @@ function startGame() {
   menu.classList.add("hidden");
   canvas.requestPointerLock();
 }
+function applySettings() {
+  RENDER_DIST = Settings.renderDist;
+  camera.fov = Settings.fov;
+  camera.updateProjectionMatrix();
+  scene.fog = Settings.fog ? fog : null;
+}
+
 document.getElementById("play").onclick = startGame;
+const settingsOverlay = document.getElementById("settings");
+document.getElementById("open-settings").onclick = () => {
+  buildSettingsUI(applySettings);
+  menu.classList.add("hidden");
+  settingsOverlay.classList.remove("hidden");
+};
+document.getElementById("settings-close").onclick = () => {
+  settingsOverlay.classList.add("hidden");
+  if (!running) menu.classList.remove("hidden");
+};
 document.addEventListener("pointerlockchange", () => {
-  if (document.pointerLockElement !== canvas && running && !inventoryOpen
+  if (document.pointerLockElement !== canvas && running && !inventoryOpen && !chatOpen
       && document.getElementById("death").classList.contains("hidden"))
     menu.classList.remove("hidden");
   else menu.classList.add("hidden");
@@ -812,7 +946,7 @@ function loop() {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
-  if (running && !inventoryOpen) {
+  if (running && !inventoryOpen && !chatOpen) {
     updatePlayer(dt);
     updateMobs(dt);
     spawnZombies();
@@ -857,8 +991,9 @@ function loop() {
       `xyz ${player.pos.x.toFixed(1)} ${player.pos.y.toFixed(1)} ${player.pos.z.toFixed(1)}\n` +
       `chunks ${chunkMeshes.size}  mobs ${mobs.length}  border ±${world.limit}\n` +
       `${world.nether ? "" : (timeOfDay * 24).toFixed(1) + "h  " + (isDay() ? "day" : "night") + "  "}` +
-      `fly ${player.flying ? "on" : "off"}  armor ${armor.equipped ? armor.durability + "/10" : "off"}`;
+      `${gamemode}  fly ${player.flying ? "on" : "off"}  armor ${armor.equipped ? armor.durability + "/10" : "off"}`;
 
   renderer.render(scene, camera);
 }
+applySettings();
 loop();
