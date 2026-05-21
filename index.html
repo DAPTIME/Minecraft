@@ -76,6 +76,7 @@
       <p><b>F</b> fly (creative only) &nbsp; <b>R</b> equip wooden armor</p>
       <p>Starts in <b>survival</b> — type <b>/gamemode creative</b> in chat to switch</p>
       <p>Place a <b>Nether Portal</b> block and stand in it to travel</p>
+      <p style="color:#7ac74f;margin-top:6px;"><b>📱 On phone / iPad:</b> joystick (left), drag to look, on-screen buttons. Tap ☰ to pause, 💬 to chat. Add to Home Screen for fullscreen!</p>
     </div>
   </div>
 </div>
@@ -90,7 +91,8 @@
 <script type="module" src="js/main.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // Relative path lets the SW register correctly under both root and subdirectory hosting.
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 </script>
 </body>

@@ -1231,6 +1231,14 @@ function loop() {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
+  // Mobile UI triggers that must work even while paused/in inventory/in chat
+  // (so users can close the inventory by tapping E again, open chat, etc).
+  if (mobile.active && running) {
+    if (mobile.triggerInventory) { mobile.triggerInventory = false; toggleInventory(); }
+    if (mobile.triggerMenu)      { mobile.triggerMenu = false; if (!chatOpen) showMenu(); }
+    if (mobile.triggerChat)      { mobile.triggerChat = false; if (!chatOpen && !inventoryOpen) openChat(""); }
+  }
+
   if (running && !inventoryOpen && !chatOpen) {
     updatePlayer(dt);
     updateMobs(dt);
@@ -1263,7 +1271,6 @@ function loop() {
       }
       if (mobile.triggerPlace)    { mobile.triggerPlace = false; swingHand(); doPlace(); }
       if (mobile.triggerAttack)   { mobile.triggerAttack = false; swingHand(); attackMob(); }
-      if (mobile.triggerInventory){ mobile.triggerInventory = false; toggleInventory(); }
     }
 
     tickBreaking(dt);

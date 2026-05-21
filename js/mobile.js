@@ -7,6 +7,8 @@ export const mobile = {
   breaking: false,
   triggerPlace: false,
   triggerInventory: false,
+  triggerMenu: false,
+  triggerChat: false,
   forward: false, back: false, left: false, right: false,
   jump: false,
   sprint: false,
@@ -71,6 +73,14 @@ function _init() {
       width: 48px; height: 48px; border-radius: 6px;
       top: 16px; right: 16px;
     }
+    #_mob_menu {
+      width: 48px; height: 48px; border-radius: 6px;
+      top: 16px; left: 16px;
+    }
+    #_mob_chat {
+      width: 48px; height: 48px; border-radius: 6px;
+      top: 16px; left: 76px; font-size: 18px;
+    }
     #_mob_sprint {
       position: fixed; width: 56px; height: 34px; border-radius: 8px;
       bottom: 28px; left: 20px;
@@ -105,6 +115,8 @@ function _init() {
   const btnFlyUp = mkBtn('_mob_flyup',  '↑');
   const btnFlyDn = mkBtn('_mob_flydn',  '↓');
   const btnInv   = mkBtn('_mob_inv',    'E');
+  const btnMenu  = mkBtn('_mob_menu',   '☰');
+  const btnChat  = mkBtn('_mob_chat',   '💬');
 
   const btnSprint = document.createElement('div');
   btnSprint.id = '_mob_sprint';
@@ -143,8 +155,10 @@ function _init() {
   btnFlyDn.addEventListener('touchend',   (e) => { e.preventDefault(); mobile.flying_down = false; }, { passive: false });
   btnFlyDn.addEventListener('touchcancel',(e) => { e.preventDefault(); mobile.flying_down = false; }, { passive: false });
 
-  // ── inventory ─────────────────────────────────────────────────────────────
-  btnInv.addEventListener('touchstart', (e) => { e.preventDefault(); mobile.triggerInventory = true; }, { passive: false });
+  // ── inventory / pause menu / chat ────────────────────────────────────────
+  btnInv.addEventListener('touchstart',  (e) => { e.preventDefault(); mobile.triggerInventory = true; }, { passive: false });
+  btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); mobile.triggerMenu = true; },      { passive: false });
+  btnChat.addEventListener('touchstart', (e) => { e.preventDefault(); mobile.triggerChat = true; },      { passive: false });
 
   // ── joystick + look ────────────────────────────────────────────────────────
   const canvas = document.getElementById('canvas');
