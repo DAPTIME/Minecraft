@@ -1,0 +1,28 @@
+# Netlify configuration for DevCraft
+# Deploy by dragging the folder onto https://app.netlify.com/drop
+
+[build]
+  publish = "."
+
+# Service worker must be served with no-cache so updates reach the client.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store"
+
+# Long-cache for versioned JS/CSS/assets
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
