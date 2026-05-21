@@ -79,6 +79,7 @@ const player = {
   yaw: 0, pitch: 0,
   onGround: false, flying: false, inWater: false, inLava: false,
   health: 20, maxHealth: 20, hurtCooldown: 0, lavaCd: 0,
+  food: 20, foodMax: 20, starveCd: 0,
 };
 const P_RAD = 0.3, P_HEIGHT = 1.8, EYE = 1.62;
 const spawn = new THREE.Vector3();
@@ -300,13 +301,15 @@ function raycastBlock() {
 // =============================================================================
 // Hotbar / inventory
 // =============================================================================
+// every placeable block (and the apple item) — shown in the creative palette
 const ALL_BLOCKS = [
-  B.GRASS, B.DIRT, B.STONE, B.COBBLE, B.SAND, B.GRAVEL, B.SANDSTONE, B.ORANGE,
+  B.GRASS, B.DIRT, B.PATH, B.STONE, B.COBBLE, B.SAND, B.GRAVEL, B.SANDSTONE, B.ORANGE,
   B.LOG, B.PLANKS, B.LEAVES, B.BIRCH_LOG, B.BIRCH_PLANKS, B.BIRCH_LEAVES,
   B.SPRUCE_LOG, B.SPRUCE_PLANKS, B.SPRUCE_LEAVES, B.GLASS, B.CACTUS,
-  B.NETHERRACK, B.SLIME, B.WOOL, B.LAVA,
+  B.NETHERRACK, B.SLIME, B.WOOL, B.WATER, B.LAVA, B.BEDROCK,
   B.REDSTONE_BLOCK, B.REDSTONE_DUST, B.LEVER, B.REPEATER,
   B.PISTON, B.STICKY_PISTON, B.PORTAL,
+  B.APPLE,
 ];
 // each hotbar slot: { id, count }.  id === B.AIR means empty.
 const hotbar = Array.from({ length: 9 }, () => ({ id: B.AIR, count: 0 }));
@@ -388,7 +391,8 @@ function setGamemode(g) {
   if (g !== "survival" && g !== "creative") return;
   gamemode = g;
   player.flying = (g === "creative");          // creative auto-enables fly
-  buildHotbar(); buildInventory(); updateHand();
+  if (g === "creative") player.food = player.foodMax;
+  buildHotbar(); buildInventory(); updateHand(); updateHUD();
   chatMsg("Game mode set to " + g);
 }
 
@@ -442,6 +446,7 @@ document.getElementById("respawn").onclick = () => {
 // HUD
 // =============================================================================
 const healthbar = document.getElementById("healthbar");
+const hungerbar = document.getElementById("hungerbar");
 const armorbar = document.getElementById("armorbar");
 function updateHUD() {
   healthbar.innerHTML = "";
@@ -451,6 +456,15 @@ function updateHUD() {
     p.className = "pip " + (i < full ? "heart-full" : "heart-empty");
     healthbar.appendChild(p);
   }
+  hungerbar.innerHTML = "";
+  if (gamemode === "survival") {
+    const ham = Math.round(player.food / 2);
+    for (let i = 0; i < 10; i++) {
+      const p = document.createElement("div");
+      p.className = "pip " + (i < ham ? "hunger-full" : "hunger-empty");
+      hungerbar.appendChild(p);
+    }
+  }
   armorbar.innerHTML = "";
   if (armor.equipped)
     for (let i = 0; i < armor.maxDurability; i++) {
@@ -458,6 +472,25 @@ function updateHUD() {
       p.className = "pip " + (i < armor.durability ? "armor-full" : "armor-empty");
       armorbar.appendChild(p);
     }
+}
+
+let hungerHudCd = 0;
+function updateHunger(dt) {
+  if (gamemode !== "survival") { player.food = player.foodMax; return; }
+  const moving = Math.hypot(player.vel.x, player.vel.z) > 0.5;
+  const sprint = moving && keys.has(Settings.keys.sprint);
+  const rate = sprint ? 0.09 : moving ? 0.04 : 0.012;
+  const prev = player.food;
+  player.food = Math.max(0, player.food - rate * dt);
+  // starvation: damage every 4s while food = 0 (only down to half health)
+  if (player.food <= 0 && player.health > 10) {
+    player.starveCd -= dt;
+    if (player.starveCd <= 0) { hurtPlayer(1); player.starveCd = 4; }
+  } else player.starveCd = 0;
+  hungerHudCd -= dt;
+  if (Math.floor(prev) !== Math.floor(player.food) || hungerHudCd <= 0) {
+    updateHUD(); hungerHudCd = 1;
+  }
 }
 const toastEl = document.getElementById("toast");
 let toastTimer = 0;
@@ -471,30 +504,87 @@ function boxMesh(w, h, d, color) {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
     new THREE.MeshLambertMaterial({ color }));
 }
+
+// Box with a painted front face — used for mob heads / chests so they
+// actually look like creatures instead of monochrome boxes.
+function paintedBox(w, h, d, base, faceFn) {
+  const plain = new THREE.MeshLambertMaterial({ color: base });
+  if (!faceFn) return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), plain);
+  const c = document.createElement("canvas");
+  c.width = c.height = 32;
+  const g = c.getContext("2d");
+  const hex = "#" + base.toString(16).padStart(6, "0");
+  g.fillStyle = hex; g.fillRect(0, 0, 32, 32);
+  faceFn(g, hex);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  const front = new THREE.MeshLambertMaterial({ map: tex });
+  // BoxGeometry material order: [+x, -x, +y, -y, +z, -z]; +z is the "front"
+  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    [plain, plain, plain, plain, front, plain]);
+}
 function makeVillager() {
   const g = new THREE.Group();
-  const body = boxMesh(0.5, 0.8, 0.3, 0x6d4f37); body.position.y = 0.7; g.add(body);
-  const head = boxMesh(0.45, 0.45, 0.45, 0xc99a6b); head.position.y = 1.32; g.add(head);
-  const nose = boxMesh(0.12, 0.18, 0.14, 0xb07a4f); nose.position.set(0, 1.28, 0.25); g.add(nose);
+  const body = paintedBox(0.5, 0.8, 0.3, 0x6d4f37, (c) => {
+    // robe sash
+    c.fillStyle = "#8a6843"; c.fillRect(6, 6, 20, 4);
+    c.fillStyle = "#3a2818"; c.fillRect(14, 12, 4, 16);
+  });
+  body.position.y = 0.7; g.add(body);
+  const head = paintedBox(0.45, 0.45, 0.45, 0xc99a6b, (c) => {
+    c.fillStyle = "#3a2418"; c.fillRect(4, 6, 8, 3);          // brow L
+    c.fillRect(20, 6, 8, 3);                                  // brow R
+    c.fillStyle = "#0a0a0a"; c.fillRect(8, 12, 3, 3);         // eye L
+    c.fillRect(21, 12, 3, 3);                                 // eye R
+    c.fillStyle = "#b07a4f"; c.fillRect(13, 14, 6, 8);        // big nose
+    c.fillStyle = "#5a3a20"; c.fillRect(11, 24, 10, 1);       // closed mouth
+  });
+  head.position.y = 1.32; g.add(head);
   const aL = boxMesh(0.14, 0.7, 0.2, 0x5a4029); aL.position.set(-0.32, 0.75, 0); g.add(aL);
   const aR = boxMesh(0.14, 0.7, 0.2, 0x5a4029); aR.position.set(0.32, 0.75, 0); g.add(aR);
   return g;
 }
 function makeZombie() {
   const g = new THREE.Group();
-  const body = boxMesh(0.5, 0.8, 0.28, 0x3a6b3a); body.position.y = 0.7; g.add(body);
-  const head = boxMesh(0.45, 0.45, 0.45, 0x4f8f4f); head.position.y = 1.32; g.add(head);
+  const body = paintedBox(0.5, 0.8, 0.28, 0x3a6b3a, (c) => {
+    // tattered shirt
+    c.fillStyle = "#5a8a5a"; c.fillRect(4, 6, 24, 3);
+    c.fillStyle = "#2a4a2a"; c.fillRect(8, 16, 4, 6);          // tear
+    c.fillRect(18, 22, 6, 4);
+  });
+  body.position.y = 0.7; g.add(body);
+  const head = paintedBox(0.45, 0.45, 0.45, 0x4f8f4f, (c) => {
+    c.fillStyle = "#1a3a1a"; c.fillRect(5, 10, 8, 6);         // sunken eye L
+    c.fillRect(19, 10, 8, 6);                                 // sunken eye R
+    c.fillStyle = "#0a0a0a"; c.fillRect(7, 12, 3, 3);         // pupil L
+    c.fillRect(21, 12, 3, 3);                                 // pupil R
+    c.fillStyle = "#2a1a1a"; c.fillRect(9, 22, 14, 4);        // mouth
+    c.fillStyle = "#dadada"; c.fillRect(11, 22, 2, 2);        // teeth
+    c.fillRect(15, 22, 2, 2); c.fillRect(19, 22, 2, 2);
+  });
+  head.position.y = 1.32; g.add(head);
   const aL = boxMesh(0.16, 0.7, 0.2, 0x4f8f4f); aL.position.set(-0.33, 1.0, 0.25); aL.rotation.x = -1.4; g.add(aL);
   const aR = boxMesh(0.16, 0.7, 0.2, 0x4f8f4f); aR.position.set(0.33, 1.0, 0.25); aR.rotation.x = -1.4; g.add(aR);
   return g;
 }
 function makeCreeper() {
   const g = new THREE.Group();
-  const body = boxMesh(0.45, 1.0, 0.3, 0x4a8a3a); body.position.y = 0.95; g.add(body);
-  const head = boxMesh(0.45, 0.45, 0.45, 0x4f8f4f); head.position.y = 1.65; g.add(head);
-  const eyeL = boxMesh(0.1, 0.1, 0.05, 0x1a1a1a); eyeL.position.set(-0.11, 1.68, 0.22); g.add(eyeL);
-  const eyeR = boxMesh(0.1, 0.1, 0.05, 0x1a1a1a); eyeR.position.set(0.11, 1.68, 0.22); g.add(eyeR);
-  const mouth = boxMesh(0.16, 0.16, 0.05, 0x1a1a1a); mouth.position.set(0, 1.5, 0.22); g.add(mouth);
+  const body = paintedBox(0.45, 1.0, 0.3, 0x4a8a3a, (c) => {
+    // mottled green torso
+    c.fillStyle = "#3a6b2a";
+    c.fillRect(6, 6, 4, 6); c.fillRect(20, 14, 6, 4);
+    c.fillStyle = "#5fa83a"; c.fillRect(14, 8, 4, 4);
+  });
+  body.position.y = 0.95; g.add(body);
+  const head = paintedBox(0.45, 0.45, 0.45, 0x4f8f4f, (c) => {
+    // big square eyes + iconic creeper mouth
+    c.fillStyle = "#0a0a0a";
+    c.fillRect(6, 8, 7, 7); c.fillRect(19, 8, 7, 7);
+    c.fillRect(12, 18, 8, 4);
+    c.fillRect(10, 22, 4, 5); c.fillRect(18, 22, 4, 5);
+  });
+  head.position.y = 1.65; g.add(head);
   for (const [x, z] of [[-0.13, -0.1], [0.13, -0.1], [-0.13, 0.1], [0.13, 0.1]]) {
     const leg = boxMesh(0.18, 0.42, 0.18, 0x3a6b3a);
     leg.position.set(x, 0.21, z);
@@ -505,9 +595,20 @@ function makeCreeper() {
 
 function makePillager() {
   const g = new THREE.Group();
-  const body = boxMesh(0.5, 0.8, 0.28, 0x53565c); body.position.y = 0.7; g.add(body);
-  const head = boxMesh(0.45, 0.45, 0.45, 0x9aa0a6); head.position.y = 1.32; g.add(head);
-  const nose = boxMesh(0.12, 0.2, 0.16, 0x7c8086); nose.position.set(0, 1.28, 0.26); g.add(nose);
+  const body = paintedBox(0.5, 0.8, 0.28, 0x53565c, (c) => {
+    c.fillStyle = "#3a3c40"; c.fillRect(4, 6, 24, 3);          // collar
+    c.fillStyle = "#6c6f76"; c.fillRect(14, 10, 4, 16);        // tabard
+  });
+  body.position.y = 0.7; g.add(body);
+  const head = paintedBox(0.45, 0.45, 0.45, 0x9aa0a6, (c) => {
+    c.fillStyle = "#3a3c40"; c.fillRect(4, 8, 8, 2);           // furrow L
+    c.fillRect(20, 8, 8, 2);                                   // furrow R
+    c.fillStyle = "#0a0a0a"; c.fillRect(8, 12, 3, 3);          // eye L
+    c.fillRect(21, 12, 3, 3);                                  // eye R
+    c.fillStyle = "#7c8086"; c.fillRect(13, 14, 6, 9);         // long nose
+    c.fillStyle = "#3a1a1a"; c.fillRect(11, 24, 10, 2);        // frown
+  });
+  head.position.y = 1.32; g.add(head);
   const aL = boxMesh(0.15, 0.7, 0.2, 0x44464b); aL.position.set(-0.32, 0.95, 0.2); aL.rotation.x = -1.0; g.add(aL);
   const aR = boxMesh(0.15, 0.7, 0.2, 0x44464b); aR.position.set(0.32, 0.95, 0.2); aR.rotation.x = -1.0; g.add(aR);
   return g;
@@ -834,7 +935,12 @@ function breakBlockAt(x, y, z, id) {
   if (id === B.BEDROCK || id === B.AIR) return;
   remeshDirty(editBlock(x, y, z, B.AIR));
   redstoneTimer = 0;
-  if (gamemode === "survival") giveItem(id);
+  if (gamemode === "survival") {
+    giveItem(id);
+    // oak/birch leaves occasionally drop an apple
+    if ((id === B.LEAVES || id === B.BIRCH_LEAVES) && Math.random() < 0.08)
+      giveItem(B.APPLE);
+  }
 }
 
 function tickBreaking(dt) {
@@ -895,6 +1001,19 @@ function doPlace() {
   const id = slot.id;
   if (id === B.AIR) return;
   if (gamemode === "survival" && slot.count <= 0) return;
+
+  // food items: right-click to eat instead of place
+  if (id === B.APPLE) {
+    if (player.food >= player.foodMax) { toast("Not hungry"); return; }
+    player.food = Math.min(player.foodMax, player.food + 4);
+    if (gamemode === "survival") {
+      slot.count--;
+      if (slot.count <= 0) slot.id = B.AIR;
+    }
+    swingHand();
+    buildHotbar(); updateHand(); updateHUD();
+    return;
+  }
   const pminX = player.pos.x - P_RAD, pmaxX = player.pos.x + P_RAD;
   const pminZ = player.pos.z - P_RAD, pmaxZ = player.pos.z + P_RAD;
   if (BLOCKS[id].solid &&
@@ -1122,13 +1241,17 @@ function loop() {
     tickBreaking(dt);
     if (breakCd > 0) breakCd -= dt;
 
-    if (player.health > 0 && player.health < player.maxHealth) {
+    const canRegen = gamemode === "creative" || player.food >= 6;
+    if (canRegen && player.health > 0 && player.health < player.maxHealth) {
       regenTimer -= dt;
       if (regenTimer <= 0) {
         player.health = Math.min(player.maxHealth, player.health + 1);
-        regenTimer = 3; updateHUD();
+        regenTimer = 3;
+        if (gamemode === "survival") player.food = Math.max(0, player.food - 0.6);
+        updateHUD();
       }
     }
+    updateHunger(dt);
   }
 
   if (running) { updateChunks(); updateSky(dt); updateHighlight(); }

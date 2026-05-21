@@ -19,7 +19,7 @@ export const B = {
   NETHERRACK: 23, SLIME: 24, WOOL: 25,
   REDSTONE_BLOCK: 26, REDSTONE_DUST: 27, LEVER: 28, REPEATER: 29,
   PISTON: 30, STICKY_PISTON: 31, PISTON_HEAD: 32, PORTAL: 33,
-  LAVA: 34,
+  LAVA: 34, APPLE: 35,
 };
 
 export const BLOCKS = {
@@ -57,6 +57,7 @@ export const BLOCKS = {
   [B.PISTON_HEAD]: { name: "Piston Head", all: "piston_head", solid: true },
   [B.PORTAL]: { name: "Nether Portal", all: "portal", solid: false, transparent: true },
   [B.LAVA]:  { name: "Lava", all: "lava", solid: false, transparent: true, liquid: true },
+  [B.APPLE]: { name: "Apple", all: "apple", solid: false },
 };
 
 function faceTile(id, face) {

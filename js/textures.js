@@ -339,6 +339,26 @@ const painters = {
       for (let x = 0; x < TILE; x++)
         if (rng() < 0.4) px(ctx, x, y, "#ffa552");
   },
+  apple(ctx, rng) {
+    ctx.clearRect(0, 0, TILE, TILE);
+    // round red body
+    const cx = TILE / 2, cy = TILE * 0.58, rx = TILE * 0.32, ry = TILE * 0.34;
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) {
+        const dx = (x - cx) / rx, dy = (y - cy) / ry;
+        if (dx * dx + dy * dy < 1) px(ctx, x, y, "#c81e10");
+      }
+    // highlight
+    rect(ctx, 9, 12, 4, 3, "#ff5a4f");
+    rect(ctx, 9, 12, 2, 1, "#ffffff");
+    // dimple
+    rect(ctx, TILE / 2 - 1, 7, 2, 2, "#7a1a10");
+    // stem
+    rect(ctx, TILE / 2, 4, 2, 5, "#5a3a20");
+    // leaf
+    rect(ctx, TILE / 2 + 2, 5, 5, 2, "#3f7d2c");
+    rect(ctx, TILE / 2 + 2, 6, 4, 1, "#74c24a");
+  },
   portal(ctx, rng) {
     // vertical wavy bands of purple, like a portal interior
     for (let y = 0; y < TILE; y++)
@@ -400,7 +420,7 @@ const TILE_NAMES = [
   "spruce_log_side", "spruce_log_top", "spruce_planks", "spruce_leaves",
   "netherrack", "slime", "wool", "redstone_block", "redstone_dust",
   "lever", "repeater", "piston", "piston_head", "sticky_piston", "portal",
-  "lava",
+  "lava", "apple",
 ];
 
 export function buildAtlas() {
