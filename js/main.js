@@ -3,6 +3,7 @@ import { buildAtlas, tileIcon, woodenArmorIcon } from "./textures.js";
 import { World, B, BLOCKS, CHUNK, HEIGHT, MIN_Y, MAX_Y, SEA } from "./world.js";
 import { tickRedstone, REDSTONE_IDS } from "./redstone.js";
 import { Settings, buildSettingsUI } from "./settings.js";
+import { mobile, setFlyButtons } from "./mobile.js";
 
 // =============================================================================
 // Renderer / scene
@@ -130,29 +131,29 @@ function updatePlayer(dt) {
   } else player.lavaCd = 0;
 
   const kb = Settings.keys;
-  const speed = player.flying ? 9 : keys.has(kb.sprint) ? 6.5 : 4.3;
+  const speed = player.flying ? 9 : isKey(kb.sprint) ? 6.5 : 4.3;
   const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const wish = new THREE.Vector3();
-  if (keys.has(kb.forward)) wish.add(fwd);
-  if (keys.has(kb.back)) wish.sub(fwd);
-  if (keys.has(kb.right)) wish.add(right);
-  if (keys.has(kb.left)) wish.sub(right);
+  if (isKey(kb.forward)) wish.add(fwd);
+  if (isKey(kb.back)) wish.sub(fwd);
+  if (isKey(kb.right)) wish.add(right);
+  if (isKey(kb.left)) wish.sub(right);
   if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
   player.vel.x = wish.x;
   player.vel.z = wish.z;
 
   if (player.flying) {
     player.vel.y = 0;
-    if (keys.has(kb.jump)) player.vel.y = speed;
-    if (keys.has(kb.sprint)) player.vel.y = -speed;
+    if (isKey(kb.jump)) player.vel.y = speed;
+    if (isKey(kb.sprint)) player.vel.y = -speed;
   } else {
     const grav = player.inWater ? 9 : 28;
     player.vel.y -= grav * dt;
     if (player.inWater) {
       player.vel.y = Math.max(player.vel.y, -4);
-      if (keys.has(kb.jump)) player.vel.y = 4;
-    } else if (keys.has(kb.jump) && player.onGround) {
+      if (isKey(kb.jump)) player.vel.y = 4;
+    } else if (isKey(kb.jump) && player.onGround) {
       player.vel.y = 9.2;
     }
   }
@@ -478,7 +479,7 @@ let hungerHudCd = 0;
 function updateHunger(dt) {
   if (gamemode !== "survival") { player.food = player.foodMax; return; }
   const moving = Math.hypot(player.vel.x, player.vel.z) > 0.5;
-  const sprint = moving && keys.has(Settings.keys.sprint);
+  const sprint = moving && isKey(Settings.keys.sprint);
   const rate = sprint ? 0.09 : moving ? 0.04 : 0.012;
   const prev = player.food;
   player.food = Math.max(0, player.food - rate * dt);
@@ -861,6 +862,18 @@ function switchDimension() {
 // Input
 // =============================================================================
 const keys = new Set();
+function isKey(code) {
+  if (keys.has(code)) return true;
+  if (!mobile.active || inventoryOpen || chatOpen) return false;
+  const kb = Settings.keys;
+  if (code === kb.forward) return mobile.forward;
+  if (code === kb.back)    return mobile.back;
+  if (code === kb.left)    return mobile.left;
+  if (code === kb.right)   return mobile.right;
+  if (code === kb.jump)    return mobile.jump;
+  if (code === kb.sprint)  return mobile.sprint || (player.flying && mobile.flying_down);
+  return false;
+}
 let mouseDownL = false, breakCd = 0;
 
 window.addEventListener("keydown", (e) => {
@@ -877,6 +890,7 @@ window.addEventListener("keydown", (e) => {
   if (code === Settings.keys.fly) {
     if (gamemode === "creative") {
       player.flying = !player.flying;
+      setFlyButtons(player.flying);
       toast("Fly " + (player.flying ? "on" : "off"));
     } else toast("Flying is for creative mode");
   }
@@ -944,7 +958,7 @@ function breakBlockAt(x, y, z, id) {
 }
 
 function tickBreaking(dt) {
-  if (!mouseDownL) {
+  if (!mouseDownL && !mobile.breaking) {
     breakState = null;
     breakbar.classList.remove("show");
     return;
@@ -1075,7 +1089,7 @@ function closeChat() {
   chatOpen = false;
   chatInput.classList.add("hidden");
   chatInput.blur();
-  if (running) canvas.requestPointerLock();
+  if (running && !mobile.active) canvas.requestPointerLock();
 }
 function runCommand(t) {
   if (!t.startsWith("/")) { chatMsg("<You> " + t); return; }
@@ -1164,7 +1178,7 @@ function startGame() {
   buildHotbar(); buildInventory(); updateHand(); updateHUD();
   running = true;
   menu.classList.add("hidden");
-  canvas.requestPointerLock();
+  if (!mobile.active) canvas.requestPointerLock();
   toast("Esc for pause menu  •  /settings to open settings");
 }
 function applySettings() {
@@ -1175,7 +1189,7 @@ function applySettings() {
 }
 
 document.getElementById("play").onclick = () => {
-  if (running) { menu.classList.add("hidden"); canvas.requestPointerLock(); }
+  if (running) { menu.classList.add("hidden"); if (!mobile.active) canvas.requestPointerLock(); }
   else startGame();
 };
 const settingsOverlay = document.getElementById("settings");
@@ -1192,10 +1206,11 @@ document.getElementById("open-settings").onclick = () => {
 };
 document.getElementById("settings-close").onclick = () => {
   settingsOverlay.classList.add("hidden");
-  if (running) canvas.requestPointerLock();    // resume the game directly
+  if (running && !mobile.active) canvas.requestPointerLock();
   else showMenu();
 };
 document.addEventListener("pointerlockchange", () => {
+  if (mobile.active) return;
   if (document.pointerLockElement !== canvas && running && !inventoryOpen && !chatOpen
       && document.getElementById("death").classList.contains("hidden")
       && settingsOverlay.classList.contains("hidden"))
@@ -1237,6 +1252,19 @@ function loop() {
       portalTimer += dt;
       if (portalTimer > 1.2) { switchDimension(); portalTimer = 0; }
     } else portalTimer = 0;
+
+    // Mobile look + actions
+    if (mobile.active) {
+      if (mobile.lookDx || mobile.lookDy) {
+        player.yaw -= mobile.lookDx * 0.0024 * Settings.sensitivity;
+        player.pitch -= mobile.lookDy * 0.0024 * Settings.sensitivity;
+        player.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, player.pitch));
+        mobile.lookDx = 0; mobile.lookDy = 0;
+      }
+      if (mobile.triggerPlace)    { mobile.triggerPlace = false; swingHand(); doPlace(); }
+      if (mobile.triggerAttack)   { mobile.triggerAttack = false; swingHand(); attackMob(); }
+      if (mobile.triggerInventory){ mobile.triggerInventory = false; toggleInventory(); }
+    }
 
     tickBreaking(dt);
     if (breakCd > 0) breakCd -= dt;

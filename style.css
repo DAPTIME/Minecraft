@@ -180,3 +180,14 @@ body { font-family: "Trebuchet MS", Verdana, sans-serif; }
   border-radius: 3px; cursor: pointer;
 }
 .key-btn:hover { border-color: #7ac74f; }
+
+/* Mobile touch UI */
+@media (pointer: coarse) {
+  #debug { font-size: 10px; }
+  #hotbar { gap: 3px; padding: 3px; }
+  .slot { width: 44px; height: 44px; }
+  .slot canvas { width: 32px; height: 32px; }
+  #hud { bottom: 8px; }
+  /* Push hotbar left on portrait phones to avoid right-side buttons */
+  #hand { display: none; }
+}

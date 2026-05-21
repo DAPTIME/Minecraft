@@ -1,0 +1,15 @@
+{
+  "name": "DevCraft",
+  "short_name": "DevCraft",
+  "description": "An original voxel sandbox in the Minecraft 1.14 style",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#1a2a1a",
+  "theme_color": "#7ac74f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
