@@ -488,6 +488,21 @@ function makeZombie() {
   const aR = boxMesh(0.16, 0.7, 0.2, 0x4f8f4f); aR.position.set(0.33, 1.0, 0.25); aR.rotation.x = -1.4; g.add(aR);
   return g;
 }
+function makeCreeper() {
+  const g = new THREE.Group();
+  const body = boxMesh(0.45, 1.0, 0.3, 0x4a8a3a); body.position.y = 0.95; g.add(body);
+  const head = boxMesh(0.45, 0.45, 0.45, 0x4f8f4f); head.position.y = 1.65; g.add(head);
+  const eyeL = boxMesh(0.1, 0.1, 0.05, 0x1a1a1a); eyeL.position.set(-0.11, 1.68, 0.22); g.add(eyeL);
+  const eyeR = boxMesh(0.1, 0.1, 0.05, 0x1a1a1a); eyeR.position.set(0.11, 1.68, 0.22); g.add(eyeR);
+  const mouth = boxMesh(0.16, 0.16, 0.05, 0x1a1a1a); mouth.position.set(0, 1.5, 0.22); g.add(mouth);
+  for (const [x, z] of [[-0.13, -0.1], [0.13, -0.1], [-0.13, 0.1], [0.13, 0.1]]) {
+    const leg = boxMesh(0.18, 0.42, 0.18, 0x3a6b3a);
+    leg.position.set(x, 0.21, z);
+    g.add(leg);
+  }
+  return g;
+}
+
 function makePillager() {
   const g = new THREE.Group();
   const body = boxMesh(0.5, 0.8, 0.28, 0x53565c); body.position.y = 0.7; g.add(body);
@@ -510,18 +525,49 @@ function groundHeightAt(x, z) {
   return MIN_Y + 1;
 }
 function spawnMob(type, x, y, z) {
-  const mesh = type === "zombie" ? makeZombie()
-             : type === "pillager" ? makePillager() : makeVillager();
+  const mesh = type === "zombie"   ? makeZombie()
+             : type === "pillager" ? makePillager()
+             : type === "creeper"  ? makeCreeper()
+             :                       makeVillager();
   scene.add(mesh);
   const mob = {
     type, mesh,
     pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(),
-    health: type === "zombie" ? 10 : type === "pillager" ? 16 : 12,
+    health: type === "creeper"  ? 8
+          : type === "zombie"   ? 10
+          : type === "pillager" ? 16
+          :                       12,
     home: new THREE.Vector3(x, y, z), wander: new THREE.Vector3(x, y, z),
-    attackCd: 0, wanderCd: 0,
+    attackCd: 0, wanderCd: 0, fuse: 0,
   };
   mobs.push(mob);
   return mob;
+}
+
+// blow up an area around (ex,ey,ez): damages player and clears blocks
+function explodeAt(ex, ey, ez) {
+  const radius = 3;
+  const affected = new Set();
+  for (let dx = -radius; dx <= radius; dx++)
+    for (let dy = -radius; dy <= radius; dy++)
+      for (let dz = -radius; dz <= radius; dz++) {
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > radius * radius) continue;
+        const x = Math.floor(ex + dx), y = Math.floor(ey + dy), z = Math.floor(ez + dz);
+        const id = world.getBlock(x, y, z);
+        if (id === B.AIR || id === B.BEDROCK) continue;
+        const a = world.setBlock(x, y, z, B.AIR);
+        for (const k of a) affected.add(k);
+      }
+  remeshDirty(affected);
+  redstoneTimer = 0;
+  const dist = player.pos.distanceTo(new THREE.Vector3(ex, ey, ez));
+  if (dist < 5) {
+    hurtPlayer(12 * (1 - dist / 5));
+    const kb = player.pos.clone().sub(new THREE.Vector3(ex, ey, ez)).setY(0).normalize();
+    player.vel.addScaledVector(kb, 7);
+    player.vel.y += 5;
+  }
 }
 function clearMobs() {
   for (const m of mobs) scene.remove(m.mesh);
@@ -546,13 +592,16 @@ function spawnPillagers() {
 function spawnZombies() {
   const dark = world.nether || !isDay();
   if (!dark) return;
-  if (mobs.filter(m => m.type === "zombie").length >= 14) return;
-  if (Math.random() > 0.04) return;
+  const hostiles = mobs.filter(m => m.type === "zombie" || m.type === "creeper").length;
+  if (hostiles >= 16) return;
+  if (Math.random() > 0.045) return;
   const ang = Math.random() * Math.PI * 2, r = 16 + Math.random() * 18;
   const x = player.pos.x + Math.cos(ang) * r, z = player.pos.z + Math.sin(ang) * r;
   if (!world.decorated.has(chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK)))) return;
   const y = groundHeightAt(x, z);
-  if (y > MIN_Y + 1) spawnMob("zombie", x, y, z);
+  if (y <= MIN_Y + 1) return;
+  const type = Math.random() < 0.32 ? "creeper" : "zombie";
+  spawnMob(type, x, y, z);
 }
 function updateMobs(dt) {
   for (let i = mobs.length - 1; i >= 0; i--) {
@@ -564,15 +613,33 @@ function updateMobs(dt) {
     const move = new THREE.Vector3();
     if (m.type !== "villager") {
       if (m.type === "zombie" && !world.nether && isDay() && m.pos.y > SEA) m.health -= dt * 4;
-      const aggro = m.type === "pillager" ? 32 : 26;
+      const aggro = m.type === "pillager" ? 32 : m.type === "creeper" ? 24 : 26;
       if (dist < aggro) {
-        move.copy(toPlayer).setY(0).normalize().multiplyScalar(m.type === "pillager" ? 2.9 : 2.6);
-        if (dist < 1.6 && m.attackCd <= 0) {
+        const speedScale = m.type === "pillager" ? 2.9 : m.type === "creeper" ? 2.5 : 2.6;
+        move.copy(toPlayer).setY(0).normalize().multiplyScalar(speedScale);
+
+        if (m.type === "creeper") {
+          if (dist < 3.2) {
+            m.fuse += dt;
+            const s = 1 + Math.sin(m.fuse * 28) * 0.08;
+            m.mesh.scale.set(s, 1 + m.fuse * 0.05, s);
+            if (m.fuse > 1.5) {
+              explodeAt(m.pos.x, m.pos.y + 0.6, m.pos.z);
+              m.health = 0;
+            }
+          } else if (m.fuse > 0) {
+            m.fuse = 0;
+            m.mesh.scale.set(1, 1, 1);
+          }
+        } else if (dist < 1.6 && m.attackCd <= 0) {
           hurtPlayer(m.type === "pillager" ? 3 : 4);
           m.attackCd = 1.0;
           player.vel.addScaledVector(toPlayer.setY(0).normalize(), 4);
           player.vel.y += 3;
         }
+      } else if (m.type === "creeper" && m.fuse > 0) {
+        m.fuse = 0;
+        m.mesh.scale.set(1, 1, 1);
       }
     } else {
       m.wanderCd -= dt;
@@ -621,7 +688,7 @@ function attackMob() {
 // =============================================================================
 // Day / night
 // =============================================================================
-const DAY_LENGTH = 180;
+const DAY_LENGTH = 600;          // ten-minute day/night cycle
 let timeOfDay = 0.25;
 function isDay() { return timeOfDay > 0 && timeOfDay < 0.5; }
 function updateSky(dt) {
@@ -722,7 +789,7 @@ window.addEventListener("keyup", (e) => keys.delete(e.code.toLowerCase()));
 
 canvas.addEventListener("mousedown", (e) => {
   if (document.pointerLockElement !== canvas) return;
-  if (e.button === 0) { mouseDownL = true; swingHand(); doBreak(); }
+  if (e.button === 0) { mouseDownL = true; swingHand(); attackMob(); }
   if (e.button === 2) { swingHand(); doPlace(); }
 });
 canvas.addEventListener("mouseup", (e) => { if (e.button === 0) mouseDownL = false; });
@@ -743,16 +810,70 @@ const handEl2 = document.getElementById("hand");
 let swingTimer = 0;
 function swingHand() { handEl2.classList.add("swing"); swingTimer = 0.12; }
 
-function doBreak() {
-  if (attackMob()) return;
+// per-block break time in seconds
+const HARDNESS = {
+  [B.DIRT]: 0.5, [B.GRASS]: 0.5, [B.PATH]: 0.5, [B.SAND]: 0.5, [B.GRAVEL]: 0.6,
+  [B.LEAVES]: 0.3, [B.BIRCH_LEAVES]: 0.3, [B.SPRUCE_LEAVES]: 0.3,
+  [B.LOG]: 1.2, [B.BIRCH_LOG]: 1.2, [B.SPRUCE_LOG]: 1.2,
+  [B.PLANKS]: 1.0, [B.BIRCH_PLANKS]: 1.0, [B.SPRUCE_PLANKS]: 1.0,
+  [B.GLASS]: 0.3, [B.WOOL]: 0.8, [B.SLIME]: 0.4, [B.CACTUS]: 0.4,
+  [B.STONE]: 2.0, [B.COBBLE]: 2.0, [B.SANDSTONE]: 1.5, [B.NETHERRACK]: 0.8,
+  [B.ORANGE]: 1.2, [B.REDSTONE_BLOCK]: 1.8,
+  [B.PISTON]: 0.6, [B.STICKY_PISTON]: 0.6, [B.PISTON_HEAD]: 0.6,
+  [B.LEVER]: 0.2, [B.REDSTONE_DUST]: 0.1, [B.REPEATER]: 0.3,
+  [B.PORTAL]: 0.5,
+};
+function hardnessOf(id) { return HARDNESS[id] ?? 1.0; }
+
+let breakState = null;            // { x, y, z, t, hardness }
+const breakbar = document.getElementById("breakbar");
+const breakbarFill = breakbar.querySelector(".fill");
+let lastBreakSwing = 0;
+
+function breakBlockAt(x, y, z, id) {
+  if (id === B.BEDROCK || id === B.AIR) return;
+  remeshDirty(editBlock(x, y, z, B.AIR));
+  redstoneTimer = 0;
+  if (gamemode === "survival") giveItem(id);
+}
+
+function tickBreaking(dt) {
+  if (!mouseDownL) {
+    breakState = null;
+    breakbar.classList.remove("show");
+    return;
+  }
   const r = raycastBlock();
-  if (!r) return;
+  if (!r) { breakState = null; breakbar.classList.remove("show"); return; }
   const [x, y, z] = r.hit;
   const id = world.getBlock(x, y, z);
-  if (id === B.BEDROCK) return;
-  remeshDirty(editBlock(x, y, z, B.AIR));
-  redstoneTimer = 0;                      // power may have changed
-  if (gamemode === "survival") giveItem(id);
+  if (id === B.AIR || id === B.WATER || id === B.LAVA || id === B.BEDROCK) {
+    breakState = null; breakbar.classList.remove("show"); return;
+  }
+
+  // continuously animate the hand swing while breaking
+  lastBreakSwing -= dt;
+  if (lastBreakSwing <= 0) { swingHand(); lastBreakSwing = 0.25; }
+
+  if (gamemode === "creative") {
+    breakState = null;
+    breakbar.classList.remove("show");
+    if (breakCd <= 0) { breakBlockAt(x, y, z, id); breakCd = 0.18; }
+    return;
+  }
+
+  // survival: progress over time, only counts on the same block
+  if (!breakState || breakState.x !== x || breakState.y !== y || breakState.z !== z)
+    breakState = { x, y, z, t: 0, hardness: hardnessOf(id) };
+  breakState.t += dt;
+  breakbar.classList.add("show");
+  const pct = Math.min(100, breakState.t / breakState.hardness * 100);
+  breakbarFill.style.width = pct + "%";
+  if (breakState.t >= breakState.hardness) {
+    breakBlockAt(x, y, z, id);
+    breakState = null;
+    breakbar.classList.remove("show");
+  }
 }
 
 function doPlace() {
@@ -998,7 +1119,7 @@ function loop() {
       if (portalTimer > 1.2) { switchDimension(); portalTimer = 0; }
     } else portalTimer = 0;
 
-    if (mouseDownL && breakCd <= 0) { doBreak(); breakCd = 0.22; }
+    tickBreaking(dt);
     if (breakCd > 0) breakCd -= dt;
 
     if (player.health > 0 && player.health < player.maxHealth) {

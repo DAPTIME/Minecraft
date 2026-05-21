@@ -173,15 +173,14 @@ export class World {
   }
 
   fillNetherColumn(data, x, z, wx, wz) {
-    const LAVA_SEA = MIN_Y + 12;                       // y = -52
+    const LAVA_SEA = MIN_Y + 14;                       // y = -50
     const n = fbm(wx, wz, this.seed + 701, 4, 0.012);  // 0..1
-    const surf = MIN_Y + 4 + Math.floor(n * 50);       // -60..-10
+    const surf = MIN_Y + 1 + Math.floor(n * 36);       // -63..-28
     for (let wy = MIN_Y; wy <= MAX_Y; wy++) {
       let id = B.AIR;
       if (wy === MIN_Y || wy === MAX_Y) id = B.BEDROCK;
       else if (wy <= surf)
         id = this.carveCave(wx, wy, wz) ? B.AIR : B.NETHERRACK;
-      // sea of lava: any open space at or below the lava sea fills with lava
       if (id === B.AIR && wy <= LAVA_SEA) id = B.LAVA;
       data[this.idx(x, wy, z)] = id;
     }

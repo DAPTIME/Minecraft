@@ -13,6 +13,20 @@ body { font-family: "Trebuchet MS", Verdana, sans-serif; }
   mix-blend-mode: difference;
 }
 
+#breakbar {
+  position: absolute; top: 53%; left: 50%;
+  transform: translate(-50%, 0);
+  width: 72px; height: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  display: none; pointer-events: none;
+}
+#breakbar.show { display: block; }
+#breakbar .fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #ffffff, #cfcfcf);
+}
+
 /* HUD */
 #hud {
   position: absolute; bottom: 14px; left: 50%;
